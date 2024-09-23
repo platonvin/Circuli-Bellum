@@ -1,0 +1,6 @@
+/vcpkg_installed
+/obj
+/compile_flags.txt
+/client.exe
+/shaders
+/code.cpp
