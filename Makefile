@@ -20,15 +20,23 @@ crazy_flags   = -flto -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8
 
 SHADER_FLAGS = --target-env=vulkan1.1 -g -O
 
-
 deb_objs := \
 	obj/deb/main.o\
+	obj/deb/physics.o\
+	obj/deb/visual.o\
+	obj/deb/logic.o\
 
 rel_objs := \
 	obj/rel/main.o\
+	obj/rel/physics.o\
+	obj/rel/visual.o\
+	obj/rel/logic.o\
 
 srcs := \
 	src/main.cpp\
+	src/physics.cpp\
+	src/visual.cpp\
+	src/logic.cpp\
 
 #default target
 all: init vcpkg_installed_eval lum-al/lib/liblumal.a release
@@ -47,21 +55,17 @@ vcpkg_installed_eval: vcpkg_installed
 	$(eval GLSLC := $(strip $(GLSLC_DIR))/glslc )
 
 #If someone knows a way to simplify this, please tell me 
-obj/%.o: common/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-	c++ $(special_otp_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
-DEPS = $(com_objs:.o=.d)
--include $(DEPS)
+# obj/%.o: common/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
+# 	c++ $(special_otp_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
+# DEPS = $(com_objs:.o=.d)
+# -include $(DEPS)
 
 obj/rel/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-	c++ $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
-obj/rel/%.o: src/renderer/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
 	c++ $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(rel_objs:.o=.d)
 -include $(DEPS)
 
 obj/deb/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-	c++ $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
-obj/deb/%.o: src/renderer/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
 	c++ $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(deb_objs:.o=.d)
 -include $(DEPS)
@@ -87,17 +91,10 @@ GEOM_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%$(GEOM_EXT), $(SHADER_OUT_DIR)/%Geo
 
 ALL_SHADER_TARGETS = $(COMP_TARGETS) $(VERT_TARGETS) $(FRAG_TARGETS) $(GEOM_TARGETS)
 
-$(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/%$(COMP_EXT)
-	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
-$(SHADER_OUT_DIR)/%Vert.spv: $(SHADER_SRC_DIR)/%$(VERT_EXT)
-	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
-$(SHADER_OUT_DIR)/%Frag.spv: $(SHADER_SRC_DIR)/%$(FRAG_EXT)
-	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
-$(SHADER_OUT_DIR)/%Geom.spv: $(SHADER_SRC_DIR)/%$(GEOM_EXT)
+$(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/%
 	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
 
 shaders: vcpkg_installed_eval $(ALL_SHADER_TARGETS)
-
 
 debug: init vcpkg_installed_eval shaders $(com_objs) $(deb_objs) build_deb 
 ifeq ($(OS),Windows_NT)
