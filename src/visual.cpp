@@ -29,11 +29,12 @@ void VisualView::init() {
     // Initialize other resources
     createImages();
     createSamplers();
-    setupDescriptors();
+    createShapeBuffers();    
+    createUniformBuffer();    
+    setupDescriptors(); // Only after buffers
     createPasses(); // Only after descriptors
     createPipes(); // Only after rpasses
 
-    createShapeBuffers();    
 }
 
 void VisualView::cleanup(void) {
@@ -49,6 +50,9 @@ void VisualView::setupDescriptors(void) {
         render.descriptorBuilder
             .setLayout(&fillerPipe.setLayout)
             .setDescriptorSets(&fillerPipe.sets)
+            .setDescriptions({
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RD_CURRENT, {uniform}, {/*empty*/}, NO_SAMPLER, NO_LAYOUT, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT}
+            })
             .defer();
     }
 
@@ -120,6 +124,7 @@ void VisualView::createSamplers(void) {
 
 void VisualView::start_frame(void) {
     render.start_frame({graphicsCommandBuffers.current()});
+    updateUniformBuffers();
 }
 
 void VisualView::start_main_pass(void) {
@@ -169,7 +174,12 @@ void VisualView::bloom_pass(void) {
 
 void VisualView::end_frame(void) {
     render.end_frame({graphicsCommandBuffers.current()});
+    
     graphicsCommandBuffers.move();
+    copyCommandBuffers.move();
+    frame.move();
+    staticShapeBuffer.move();
+    dynamicShapeBuffer.move();
 }
 
 void VisualView::createShapeBuffers(){
@@ -180,6 +190,13 @@ void VisualView::createShapeBuffers(){
         bufferSize = sizeof(Shape) * max_dynamic_shape_count;
     render.createBufferStorages(&dynamicShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
     render.mapBufferStorages(&dynamicShapeBuffer);
+}
+void VisualView::createUniformBuffer(){
+    VkDeviceSize 
+        bufferSize = sizeof(Camera);
+    render.createBufferStorages(&uniform, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
+    render.mapBufferStorages(&uniform);
+
 }
 void VisualView::copyStaticShapesToGPU(){
     VkDeviceSize offset = 0;
@@ -228,11 +245,11 @@ void VisualView::createFillerPipes(vector<std::pair<u8, const char*>> fshaderFil
     }
 }
 void VisualView::updateUniformBuffers(){
-    struct {vec2 pos, size;} unicopy = {camera.cameraPos, camera.cameraScale};
-    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(unicopy), &unicopy);    
+    // struct {vec2 pos, size;} unicopy = {camera.cameraPos, camera.cameraScale};
+    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(Camera), &camera);    
     render.cmdPipelineBarrier (graphicsCommandBuffers.current(),
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,
         uniform.current());   
 }
 void VisualView::drawShapes() {

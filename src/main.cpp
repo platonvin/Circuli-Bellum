@@ -33,32 +33,8 @@ l()
 
     while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
-        // ClearBackground(RAYWHITE);
-l()
-        // BeginDrawing();
-l()
-
-        // Simulate physics
-l()
         logic.tick(0.016);
-        // DrawPoly(Vector2 center, int sides, float radius, float rotation, Color color)
-l()     
-        for(let s: logic.sceneries){
-            glm::vec2 v = b2glm(b2Body_GetPosition(s->body)) + ssize/2.f;
-            // DrawRectangle(v.x, v.y, 10, 10, BEIGE);
-        }
-        for(let p: logic.players){
-            glm::vec2 v = b2glm(b2Body_GetPosition(p->body)) + ssize/2.f;
-            // DrawCircle(v.x, v.y, 1.0, MAGENTA);
-        }
-        
-        // DrawFPS(10, 10);
-l()
-        // EndDrawing();
-l()
     }
-
-    // CloseWindow();
 
     // Clean up
     logic.destroy();

@@ -11,10 +11,10 @@ layout(location = 4) in float value_2; // used to make shape size
 
 layout(location = 0) out vec4 outColor;
 
-// layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
-//     vec2 camera_pos;
-//     vec2 camera_scale;
-// } ubo;
+layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
+    vec2 camera_pos;
+    vec2 camera_scale;
+} ubo;
 
 const int Circle = 0;
 const int Square = Circle+1;

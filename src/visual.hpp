@@ -75,6 +75,7 @@ public:
     void createSamplers();
     void createFillerPipes(const vector<std::pair<u8, const char*>> shaderFiles);
     void createShapeBuffers();
+    void createUniformBuffer();
 
         void copyStaticShapesToGPU();
         void copyDynamicShapesToGPU();

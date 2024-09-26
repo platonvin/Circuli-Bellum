@@ -1,4 +1,4 @@
-.ONESHELL:
+# .ONESHELL:
 
 #setting up include and lib directories for dependencies
 I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include
@@ -55,11 +55,6 @@ vcpkg_installed_eval: vcpkg_installed
 	$(eval GLSLC := $(strip $(GLSLC_DIR))/glslc )
 
 #If someone knows a way to simplify this, please tell me 
-# obj/%.o: common/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-# 	c++ $(special_otp_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
-# DEPS = $(com_objs:.o=.d)
-# -include $(DEPS)
-
 obj/rel/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
 	c++ $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(rel_objs:.o=.d)
@@ -69,6 +64,7 @@ obj/deb/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
 	c++ $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(deb_objs:.o=.d)
 -include $(DEPS)
+
 
 SHADER_SRC_DIR = shaders
 SHADER_OUT_DIR = shaders/compiled
@@ -82,27 +78,20 @@ $(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/%
 
 shaders: vcpkg_installed_eval $(_TARGETS)
 
-debug: init vcpkg_installed_eval shaders $(com_objs) $(deb_objs) build_deb 
+
+debug: init vcpkg_installed_eval shaders $(deb_objs) build_deb 
 ifeq ($(OS),Windows_NT)
 	.\client
 else
 	./client
 endif
 	
-release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(com_objs) $(rel_objs) build_rel 
+release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_rel 
 ifeq ($(OS),Windows_NT)
 	.\client
 else
 	./client
 endif
-
-#not separate on purpose. make cleanr before usage
-release_p: args = -D_PRINTLINE
-release_p: release
-
-#not separate on purpose. make cleanr before usage
-release_vfs: args = -DVSYNC_FULLSCREEN
-release_vfs: release
 
 lum-al/lib/liblumal.a: vcpkg_installed
 	git submodule init
@@ -112,7 +101,7 @@ lum-al/lib/liblumal.a: vcpkg_installed
 	cd ..
 
 #mostly for testing
-only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(com_objs) $(rel_objs) build_rel
+only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(rel_objs) build_rel
 
 #crazy fast
 crazy: init vcpkg_installed_eval shaders
@@ -121,10 +110,10 @@ crazy_native: init vcpkg_installed_eval shaders
 	c++ $(srcs) -o crazy_client $(crazy_flags) -march=native $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 
 #i could not make it work without this
-build_deb: init vcpkg_installed_eval lum-al/lib/liblumal.a $(deb_objs) $(com_objs)
-	c++ -o client $(deb_objs) $(com_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
-build_rel: init vcpkg_installed_eval lum-al/lib/liblumal.a $(com_objs) $(rel_objs) 
-	c++ -o client $(com_objs) $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+build_deb: init vcpkg_installed_eval lum-al/lib/liblumal.a $(deb_objs)
+	c++ -o client $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+build_rel: init vcpkg_installed_eval lum-al/lib/liblumal.a $(rel_objs) 
+	c++ -o client $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 
 fun:
 	@echo -e '\033[0;36m' fun was never an option '\033[0m'

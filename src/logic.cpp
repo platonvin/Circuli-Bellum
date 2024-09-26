@@ -98,6 +98,14 @@ void LogicalScene::tick(float dTime) {
 // println
         view.start_main_pass();
 
+    for(auto s : sceneries){
+        Shape shape = {};
+            shape.coloring_info = {};
+            shape.shapeType = Circle;
+            shape.pos = vec2(0.5);
+            shape.CIRCLE_radius = (0.5);
+        view.draw_dynamic_shape(shape, SolidColor);
+    }
     for(auto p : players){
         Shape shape = {};
             shape.coloring_info = {};
@@ -106,19 +114,12 @@ void LogicalScene::tick(float dTime) {
             shape.CIRCLE_radius = (0.5);
         view.draw_dynamic_shape(shape, SolidColor);
     }
-        for(auto p : players){
-        Shape shape = {};
-            shape.coloring_info = {};
-            shape.shapeType = Circle;
-            shape.pos = vec2(0.5);
-            shape.CIRCLE_radius = (0.5);
-        view.draw_dynamic_shape(shape, SolidColor);
-    }
 // println
 // println
-            view.end_main_pass();
-            // Draw everything
-        // view.bloom_pass();
+    view.end_main_pass();
+    
+    // Draw everything
+    // view.bloom_pass();
 // println
     view.end_frame();
 // println

@@ -15,10 +15,10 @@ layout(location = 2) out vec2 out_local_pos;
 layout(location = 3) out float out_value_1; // used to make shape size
 layout(location = 4) out float out_value_2; // used to make shape size
 
-// layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
-//     vec2 camera_pos;
-//     vec2 camera_scale;
-// } ubo;
+layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
+    vec2 camera_pos;
+    vec2 camera_scale;
+} ubo;
 
 const int Circle = 0;
 const int Square = Circle+1;
@@ -73,10 +73,10 @@ void main()
     out_value_1 = value_1;
     out_value_2 = value_2;
 
-    // vec2 relative_pos = world_pos - ubo.camera_pos;
-    vec2 relative_pos = world_pos;
-    // vec2 clip = relative_pos / ubo.camera_scale;
-    vec2 clip = relative_pos;
+    vec2 relative_pos = world_pos - ubo.camera_pos;
+    // vec2 relative_pos = world_pos;
+    vec2 clip = relative_pos / ubo.camera_scale;
+    // vec2 clip = relative_pos;
     gl_Position = vec4(clip, 0, 1);
 
     // vec2 outUV = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
