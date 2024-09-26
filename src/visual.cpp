@@ -1,10 +1,28 @@
 #include "visual.hpp"
 #include <string.h>
 
-void VisualView::init(Settings settings) {
+#define println printf("%s:%d: Fun: %s\n", __FILE__, __LINE__, __FUNCTION__);
+
+void VisualView::init() {
+    Settings settings = {};
+        settings.vsync = false; //every time deciding to which image to render, wait until monitor draws current. Icreases perfomance, but limits fps
+        settings.fullscreen = false;
+        settings.debug = true; //Validation Layers. Use them while developing or be tricked into thinking that your code is correct
+        settings.timestampCount = 128;
+        settings.profile = false; //monitors perfomance via timestamps. You can place one with PLACE_TIMESTAMP() macro
+        settings.fif = 2; // Frames In Flight. If 1, then record cmdbuff and submit it. If multiple, cpu will (might) be ahead of gpu by FIF-1, which makes GPU wait less
+
+        settings.deviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
+        settings.deviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
+        settings.deviceFeatures.geometryShader = VK_TRUE;
+        settings.deviceFeatures.independentBlend = VK_TRUE;
+        settings.deviceFeatures.shaderInt16 = VK_TRUE;
+        settings.deviceFeatures11.storagePushConstant16 = VK_TRUE;
+        settings.deviceFeatures12.storagePushConstant8 = VK_TRUE;
+        settings.deviceFeatures12.shaderInt8 = VK_TRUE;
+        settings.deviceFeatures12.storageBuffer8BitAccess = VK_TRUE;
     render.init(settings);
 
-    // Create command buffers
     render.createCommandBuffers(&graphicsCommandBuffers, settings.fif);
     render.createCommandBuffers(&copyCommandBuffers, settings.fif);
 
@@ -12,7 +30,10 @@ void VisualView::init(Settings settings) {
     createImages();
     createSamplers();
     setupDescriptors();
-    createPipilines();
+    createPasses(); // Only after descriptors
+    createPipes(); // Only after rpasses
+
+    createShapeBuffers();    
 }
 
 void VisualView::cleanup(void) {
@@ -24,10 +45,12 @@ void VisualView::cleanup(void) {
 }
 
 void VisualView::setupDescriptors(void) {
-    render.descriptorBuilder
-        .setLayout(&shapesPipe.setLayout)
-        .setDescriptorSets(&shapesPipe.sets)
-        .defer();
+    for (/*mutable*/ auto& fillerPipe : fillerPipes) {
+        render.descriptorBuilder
+            .setLayout(&fillerPipe.setLayout)
+            .setDescriptorSets(&fillerPipe.sets)
+            .defer();
+    }
 
     render.descriptorBuilder
         .setLayout(&bloomPipe.setLayout)
@@ -63,22 +86,32 @@ void VisualView::cleanupSwapchainDependent(void) {
     render.deleteImages(&maskFrame);
 }
 
-void VisualView::createPipilines(void) {
-    render.pipeBuilder.setStages({
-            {"shaders/shapes.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
-            {"shaders/shapes.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
-        })
-        .setExtent(render.swapChainExtent)
-        .setBlends({BLEND_MIX})
-        .buildRaster(&shapesPipe);
+void VisualView::createPasses(void) {
+    vector<RasterPipe*> pipes = {};
+    for(auto& pipe: fillerPipes){
+        pipes.push_back(&pipe);
+    }
+    render.renderPassBuilder.setAttachments({
+            {&render.swapchainImages, Clear,Store, DontCare,DontCare, {}, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
+                         //pipes, no input, output to swapchain, no depth
+        }).setSubpasses({{pipes, {}, {&render.swapchainImages}, {}}}).build(&mainPass);
 
-    render.pipeBuilder.setStages({
-            {"shaders/bloom.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
-            {"shaders/bloom.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
-        })
-        .setExtent(render.swapChainExtent)
-        .setBlends({BLEND_MIX})
-        .buildRaster(&bloomPipe);
+    //TODO BLOOM
+}
+
+void VisualView::createPipes(void) {
+    createFillerPipes({
+        {SolidColor, "shaders/compiled/solid.frag.spv"},
+        {RandomColor, "shaders/compiled/random.frag.spv"}, 
+    });
+
+    // render.pipeBuilder.setStages({
+    //         {"shaders/compiled/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
+    //         {"shaders/compiled/bloom.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
+    //     })
+    //     .setExtent(render.swapChainExtent)
+    //     .setBlends({BLEND_MIX})
+    //     .buildRaster(&bloomPipe);
 }
 
 void VisualView::createSamplers(void) {
@@ -91,20 +124,36 @@ void VisualView::start_frame(void) {
 
 void VisualView::start_main_pass(void) {
     render.cmdBeginRenderPass(graphicsCommandBuffers.current(), &mainPass);
-    dynamic_shapes.clear();
+    reset_dynamic_shapes();
 }
 
-void VisualView::reset_static_shapes(void){static_shapes.clear();}
-void VisualView::draw_static_shape(Shape shape) {static_shapes.push_back(shape);}
-
-void VisualView::draw_shape(Shape shape){dynamic_shapes.push_back(shape);}
+void VisualView::reset_static_shapes(void){
+    // Map itself is untouched
+    // Vectors that store "drawn" shapes are cleared 
+    for(auto& shapes : static_shape_vectors){
+        shapes.clear();}
+}
+void VisualView::reset_dynamic_shapes(void){
+    // Map itself is untouched
+    // Vectors that store "drawn" shapes are cleared 
+    for(auto& shapes : dynamic_shape_vectors){
+        shapes.clear();}
+}
+void VisualView::draw_static_shape(Shape shape, ColoringType type) {
+    static_shape_vectors[type].push_back(shape);}
+void VisualView::draw_dynamic_shape(Shape shape, ColoringType type){
+    dynamic_shape_vectors[type].push_back(shape);}
 
 void VisualView::end_main_pass(void) {
-    // Now, given shapes in vector, we need to prepare them, send to GPU and render
+    // Now, given shapes in vector, we need to send them to GPU and render
+// println
+    copyDynamicShapesToGPU();
+// println
+    drawShapes();
+// println
 
-    // for()
-    
     render.cmdEndRenderPass(graphicsCommandBuffers.current(), &mainPass);
+// println
 }
 
 void VisualView::mipmap_bloom(void) {
@@ -127,74 +176,97 @@ void VisualView::createShapeBuffers(){
     VkDeviceSize 
         bufferSize = sizeof(Shape) * max_static_shape_count;
     render.createBufferStorages(&staticShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
-    render.mapBufferStorages(staticShapeBuffer);
+    render.mapBufferStorages(&staticShapeBuffer);
         bufferSize = sizeof(Shape) * max_dynamic_shape_count;
     render.createBufferStorages(&dynamicShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
-    render.mapBufferStorages(dynamicShapeBuffer);
+    render.mapBufferStorages(&dynamicShapeBuffer);
 }
 void VisualView::copyStaticShapesToGPU(){
     VkDeviceSize offset = 0;
-    for (const auto& [coloringType, shapes] : static_shapes) {
+    for (const auto& shapes : static_shape_vectors) {
         VkDeviceSize size = sizeof(Shape) * shapes.size();
         assert(offset + size <= sizeof(Shape) * max_static_shape_count);
 
-        // Copy shapes into the mapped buffer with the appropriate offset
-        memcpy(((char*)staticShapeBuffer.current().mapped + offset), shapes.data(), size);
+        memcpy((char*)staticShapeBuffer.current().mapped + offset, shapes.data(), size);
         offset += size;
     }
 }
 void VisualView::copyDynamicShapesToGPU(){
+// println
         VkDeviceSize offset = 0;
-        for (const auto& [coloringType, shapes] : dynamic_shapes) {
+// println
+        for (const auto& shapes : dynamic_shape_vectors) {
             VkDeviceSize size = sizeof(Shape) * shapes.size();
-            assert(offset + size <= sizeof(Shape) * max_dynamic_shape_count);
+            if(size > 0){
+                assert(offset + size <= sizeof(Shape) * max_dynamic_shape_count);
+                dynamicShapeBuffer.current();
 
-            // Copy shapes into the mapped buffer with the appropriate offset
-            memcpy(dynamicShapeBuffer.current().mapped + offset, shapes.data(), size);
-            offset += size;
+                memcpy((char*)dynamicShapeBuffer.current().mapped + offset, shapes.data(), size);
+                offset += size;
+            }
         }
 }
 
 void VisualView::createFillerPipes(vector<std::pair<u8, const char*>> fshaderFiles){
-        for (const auto& [coloringType, fragmentShaderFile] : fshaderFiles) {
-            RasterPipe pipe;
-            render.pipeBuilder.setStages({
-                {"shaders/compiled/default.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
-                {fragmentShaderFile, VK_SHADER_STAGE_FRAGMENT_BIT}
-                }).setExtent(render.swapChainExtent).setBlends({BLEND_MIX})
-                .buildRaster(&pipe);
-            fillerPipes.emplace_back(coloringType, pipe);
-        }
+    //so they can be in any order
+    for (const auto& [coloringType, fragmentShaderFile] : fshaderFiles) {
+        RasterPipe& pipe = fillerPipes[coloringType];
+        render.pipeBuilder.setStages({
+            {"shaders/compiled/default.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
+            {fragmentShaderFile, VK_SHADER_STAGE_FRAGMENT_BIT}
+            }).setExtent(render.swapChainExtent).setBlends({BLEND_MIX})
+            .setAttributes({
+                {VK_FORMAT_R8G8B8_UINT, offsetof (Shape, coloring_info)},
+                {VK_FORMAT_R8_UINT, offsetof (Shape, shapeType)},
+                {VK_FORMAT_R32G32_SFLOAT, offsetof (Shape, pos)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, value_1)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, value_2)},
+            }).setStride(sizeof(Shape)).setPushConstantSize(0)
+            .setExtent(render.swapChainExtent).setBlends({BLEND_MIX})
+            .setCulling(VK_CULL_MODE_NONE).setInputRate(VK_VERTEX_INPUT_RATE_INSTANCE).setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+            .buildRaster(&pipe);
+    }
 }
 void VisualView::updateUniformBuffers(){
-
+    struct {vec2 pos, size;} unicopy = {camera.cameraPos, camera.cameraScale};
+    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(unicopy), &unicopy);    
+    render.cmdPipelineBarrier (graphicsCommandBuffers.current(),
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+        uniform.current());   
 }
 void VisualView::drawShapes() {
-    VkDeviceSize offsets[] = {0};
+// println
     VkDeviceSize staticOffset = 0;
     VkDeviceSize dynamicOffset = 0;
     VkCommandBuffer commandBuffer = graphicsCommandBuffers.current();
-
+// println
     // Draw corresponding shapes for each pair of {coloringType, pipe}
-    for (const auto& [coloringType, pipe] : fillerPipes) {
-        render.cmdBindPipe(commandBuffer, pipe);
+    // Total ColoringType's * 2 drawcalls
+// println
+    for (int coloringType=0; coloringType<COLORING_TYPE_SIZE; coloringType++) {
+// println
+        render.cmdBindPipe(commandBuffer, fillerPipes[coloringType]);
+// println
 
         // Draw static shapes
-        if (static_shapes.count(coloringType) > 0) {
-            auto& currentShapes = static_shapes[coloringType];
-
+        auto& staticShapes = static_shape_vectors[coloringType];
+        if (staticShapes.size() > 0) {
+// println
             render.cmdBindVertexBuffers(commandBuffer, 0, 1, &staticShapeBuffer.current().buffer, &staticOffset);
-            render.cmdDraw(commandBuffer, 6, currentShapes.size(), 0, 0);
-            staticOffset += sizeof(Shape) * currentShapes.size();
+            render.cmdDraw(commandBuffer, 6, staticShapes.size(), 0, 0);
+            staticOffset += sizeof(Shape) * staticShapes.size();
         }
 
+// println
         // Draw dynamic shapes
-        if (dynamic_shapes.count(coloringType) > 0) {
-            auto& currentShapes = dynamic_shapes[coloringType];
-
+        auto& dynamicShapes = dynamic_shape_vectors[coloringType];
+        if (dynamicShapes.size() > 0) {
+// println
             render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &dynamicOffset);
-            render.cmdDraw(commandBuffer, 6, currentShapes.size(), 0, 0);
-            dynamicOffset += sizeof(Shape) * currentShapes.size();
+            render.cmdDraw(commandBuffer, 6, dynamicShapes.size(), 0, 0);
+            dynamicOffset += sizeof(Shape) * dynamicShapes.size();
         }
+// println
     }
 }

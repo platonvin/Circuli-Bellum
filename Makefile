@@ -73,28 +73,14 @@ DEPS = $(deb_objs:.o=.d)
 SHADER_SRC_DIR = shaders
 SHADER_OUT_DIR = shaders/compiled
 
-COMP_EXT = .comp
-VERT_EXT = .vert
-FRAG_EXT = .frag
-GEOM_EXT = .geom
-
-COMP_SHADERS = $(wildcard $(SHADER_SRC_DIR)/*$(COMP_EXT))
-VERT_SHADERS = $(wildcard $(SHADER_SRC_DIR)/*$(VERT_EXT))
-FRAG_SHADERS = $(wildcard $(SHADER_SRC_DIR)/*$(FRAG_EXT))
-GEOM_SHADERS = $(wildcard $(SHADER_SRC_DIR)/*$(GEOM_EXT))
-SHADERS = $(wildcard $(SHADER_SRC_DIR)/*$(GEOM_EXT))
-
-COMP_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%$(COMP_EXT), $(SHADER_OUT_DIR)/%.spv, $(COMP_SHADERS))
-VERT_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%$(VERT_EXT), $(SHADER_OUT_DIR)/%Vert.spv, $(VERT_SHADERS))
-FRAG_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%$(FRAG_EXT), $(SHADER_OUT_DIR)/%Frag.spv, $(FRAG_SHADERS))
-GEOM_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%$(GEOM_EXT), $(SHADER_OUT_DIR)/%Geom.spv, $(GEOM_SHADERS))
-
-ALL_SHADER_TARGETS = $(COMP_TARGETS) $(VERT_TARGETS) $(FRAG_TARGETS) $(GEOM_TARGETS)
+_SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.vert)
+_SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.frag)
+_TARGETS = $(patsubst $(SHADER_SRC_DIR)/%, $(SHADER_OUT_DIR)/%.spv, $(_SHADERS))
 
 $(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/%
 	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
 
-shaders: vcpkg_installed_eval $(ALL_SHADER_TARGETS)
+shaders: vcpkg_installed_eval $(_TARGETS)
 
 debug: init vcpkg_installed_eval shaders $(com_objs) $(deb_objs) build_deb 
 ifeq ($(OS),Windows_NT)

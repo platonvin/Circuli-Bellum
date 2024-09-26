@@ -1,5 +1,3 @@
-#include "../box2d/include/box2d/box2d.h"
-
 #include <cassert>
 #include <glm/glm.hpp>
 using namespace glm;
@@ -12,7 +10,7 @@ using namespace glm;
 
 #define l()
 // #define pl(x)
-#define apl(x)
+// #define apl(x)
 
 #define let auto
 
@@ -32,7 +30,9 @@ l()
     logic.addPlayer({0.03,100.123}, 10, 100);
     logic.addScenery({0.01,0.02}, 10, 100);
     // Main loop
-    while (!glfwWindowShouldClose(logic.view.render.window.pointer)) {
+
+    while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
+        glfwPollEvents();
         // ClearBackground(RAYWHITE);
 l()
         // BeginDrawing();

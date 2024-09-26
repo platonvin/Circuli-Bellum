@@ -1,5 +1,6 @@
 #pragma once
 
+#define GLFW_INCLUDE_NONE
 #include "al.hpp"
 
 typedef struct Camera {
@@ -17,31 +18,35 @@ enum ShapeType{
 enum ColoringType{
     SolidColor,
     RandomColor,
+    COLORING_TYPE_SIZE,
 };
 
 typedef struct Shape {
-    u8 coloringType;
-    u8vec3 color; //solid color.
+    u8vec3 coloring_info; // Solid color AND anything else for non-solid-color coloringType
+    u8 shapeType;
     vec2 pos;
 
-    u8 shapeType;
     union {
         struct{
             float CIRCLE_radius;
         };
         struct{
-            float SQUARE_width;
-            float SQUARE_height;
+            float SQUARE_half_width;
+            float SQUARE_half_height;
         };
         struct{
             float CAPSULE_radius;
-            float CAPSULE_length;
+            float CAPSULE_half_length;
+        };
+        struct{ // for attributes
+            float value_1;
+            float value_2;
         };
     };
     // TODO: char size?
 } Shape;
 
-// Why runtime? For later runtime mods
+// TODO runtime? For later runtime mods
 class VisualView{
 public:
     Renderer render = {};
@@ -49,41 +54,43 @@ public:
     const int max_dynamic_shape_count = 1024;
     // Created on level setup
     // vector<Shape> static_shapes = {};
-    std::unordered_map<u8, vector<Shape>> static_shapes;
+    std::array<vector<Shape>, COLORING_TYPE_SIZE> static_shape_vectors;
     // Resets every frame
     // vector<Shape> dynamic_shapes = {};
-    std::unordered_map<u8, vector<Shape>> dynamic_shapes;
+    std::array<vector<Shape>, COLORING_TYPE_SIZE> dynamic_shape_vectors;
 
-    vector<std::pair<u8, RasterPipe>> fillerPipes;
+    std::array<RasterPipe, COLORING_TYPE_SIZE> fillerPipes;
 
     Camera camera = {};
 
     // Store a pair of RasterPipe and coloringType
-    void init (Settings settings);
+    void init ();
     void cleanup();
-    void setupDescriptors();
     void createImages();
     void createSwapchainDependentImages();
     void cleanupSwapchainDependent();
-    void createPipilines();
+    void setupDescriptors();
+    void createPasses();
+    void createPipes();
     void createSamplers();
-
+    void createFillerPipes(const vector<std::pair<u8, const char*>> shaderFiles);
     void createShapeBuffers();
+
         void copyStaticShapesToGPU();
         void copyDynamicShapesToGPU();
         // void sortStaticShapesByColoringType();
         // void sortDynamicShapesByColoringType();
-    void createFillerPipes(const vector<std::pair<u8, const char*>> shaderFiles);
     void updateUniformBuffers();
     void drawShapes();
     // sets voxels and size. By default uses first .vox palette as main palette
 
     void reset_static_shapes();
-        void draw_static_shape(Shape);
+        void draw_static_shape(Shape, ColoringType);
 
+    void reset_dynamic_shapes();
     void start_frame();
         void start_main_pass();
-            void draw_shape(Shape);
+            void draw_dynamic_shape(Shape, ColoringType);
         void end_main_pass();
         void mipmap_bloom();
         void bloom_pass();
@@ -96,12 +103,13 @@ public:
 
     RenderPass mainPass; //draws everything
     RenderPass bloomPass; //bloom!
+    //TODO BLOOM
 
     ring<VkCommandBuffer> graphicsCommandBuffers;
     ring<VkCommandBuffer> copyCommandBuffers; //runtime copies for ui. Also does first frame resources
 
     ring<Image> frame;
-    ring<Image> maskFrame; //where lowres renders to. Blends with highres afterwards
+    ring<Image> maskFrame;
     ring<Buffer> uniform;
 
   private:

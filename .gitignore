@@ -2,5 +2,5 @@
 /obj
 /compile_flags.txt
 /client.exe
-/shaders
+/shaders/compiled
 /code.cpp

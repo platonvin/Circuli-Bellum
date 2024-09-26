@@ -1,4 +1,5 @@
 #include "logic.hpp"
+#define println printf("%s:%d: Fun: %s\n", __FILE__, __LINE__, __FUNCTION__);
 
 void LogicalScene::addPlayer(const b2Vec2& position, float radius, float mass) {
     Player* player = new Player();
@@ -43,6 +44,7 @@ bool CustomPreSolveFcn( b2ShapeId shapeIdA, b2ShapeId shapeIdB, b2Manifold* mani
 void LogicalScene::create(void) {
     world.create(gravity);
 
+    view.init();
     // TODO: do i need it?
     // Logical scene is passed, but could also be global var.
     // world.setFilterCallback(&CustomFilterFcn, this);
@@ -93,8 +95,31 @@ void LogicalScene::tick(float dTime) {
     }
 
     view.start_frame();
+// println
         view.start_main_pass();
+
+    for(auto p : players){
+        Shape shape = {};
+            shape.coloring_info = {};
+            shape.shapeType = Circle;
+            shape.pos = vec2(0.5);
+            shape.CIRCLE_radius = (0.5);
+        view.draw_dynamic_shape(shape, SolidColor);
+    }
+        for(auto p : players){
+        Shape shape = {};
+            shape.coloring_info = {};
+            shape.shapeType = Circle;
+            shape.pos = vec2(0.5);
+            shape.CIRCLE_radius = (0.5);
+        view.draw_dynamic_shape(shape, SolidColor);
+    }
+// println
+// println
+            view.end_main_pass();
             // Draw everything
-        view.bloom_pass();
+        // view.bloom_pass();
+// println
     view.end_frame();
+// println
 }
