@@ -4,3 +4,6 @@
 [submodule "lum-al"]
 	path = lum-al
 	url = https://github.com/platonvin/lum-al.git
+[submodule "tw-colors-cpp"]
+	path = tw-colors-cpp
+	url = https://github.com/platonvin/tw-colors-cpp
