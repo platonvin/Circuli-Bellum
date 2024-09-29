@@ -1,6 +1,9 @@
 #pragma once
+#include "macros.hpp"
+#ifndef __VISUAL_HPP__
+#define __VISUAL_HPP__
 
-#define GLFW_INCLUDE_NONE
+// #define GLFW_INCLUDE_NONE
 #include "al.hpp"
 
 typedef struct Camera {
@@ -9,40 +12,42 @@ typedef struct Camera {
     //TODO damper?
 } Camera;
 
-enum ShapeType{
+enum ShapeType : unsigned char{
     Circle,
     Square,
     Capsule,
 };
 
-enum ColoringType{
+enum ColoringType : unsigned char{
     SolidColor,
     RandomColor,
     COLORING_TYPE_SIZE,
 };
 
+typedef union ShapeProps {
+    struct{
+        float CIRCLE_radius;
+    };
+    struct{
+        float SQUARE_half_width;
+        float SQUARE_half_height;
+    };
+    struct{
+        float CAPSULE_radius;
+        float CAPSULE_half_length;
+    };
+    struct{ // for attributes
+        float value_1 = 69.420; // for easy debugging
+        float value_2 = 69.420; // for easy debugging
+    };
+} ShapeProps;
+
 typedef struct Shape {
     u8vec3 coloring_info; // Solid color AND anything else for non-solid-color coloringType
-    u8 shapeType;
+    ShapeType shapeType;
     vec2 pos;
 
-    union {
-        struct{
-            float CIRCLE_radius;
-        };
-        struct{
-            float SQUARE_half_width;
-            float SQUARE_half_height;
-        };
-        struct{
-            float CAPSULE_radius;
-            float CAPSULE_half_length;
-        };
-        struct{ // for attributes
-            float value_1;
-            float value_2;
-        };
-    };
+    ShapeProps props;
     // TODO: char size?
 } Shape;
 
@@ -68,12 +73,12 @@ public:
     void cleanup();
     void createImages();
     void createSwapchainDependentImages();
-    void cleanupSwapchainDependent();
+    // void cleanupSwapchainDependent();
     void setupDescriptors();
     void createPasses();
     void createPipes();
     void createSamplers();
-    void createFillerPipes(const vector<std::pair<u8, const char*>> shaderFiles);
+    void createFillerPipes(const vector<std::pair<ColoringType, const char*>> shaderFiles);
     void createShapeBuffers();
     void createUniformBuffer();
 
@@ -115,4 +120,42 @@ public:
 
   private:
     const VkFormat FRAME_FORMAT = VK_FORMAT_R16G16B16A16_UNORM;
+
+    std::function<VkResult(void)> createSwapchainDependent = [this](){
+        graphicsCommandBuffers = {};
+        copyCommandBuffers = {};
+        for(let frp : fillerPipes){
+            frp = {};
+        }
+        
+        render.createCommandBuffers(&graphicsCommandBuffers, render.settings.fif);
+        render.createCommandBuffers(&copyCommandBuffers, render.settings.fif);
+
+        // Initialize other resources
+        createImages();
+        // createSamplers();
+        setupDescriptors(); // Only after buffers
+        createPasses(); // Only after descriptors
+        createPipes(); // Only after rpasses
+
+        //you have to set this if you want to use builtin profiler
+        render.mainCommandBuffers = &graphicsCommandBuffers;
+
+        return VK_SUCCESS;
+    };
+
+    std::function<VkResult(void)> cleanupSwapchainDependent = [this](){
+        render.deviceWaitIdle();
+        
+        render.deleteImages(&frame);
+        render.deleteImages(&maskFrame);
+        
+        render.destroyRenderPass(&mainPass);
+        for(let frp : fillerPipes){
+            render.destroyRasterPipeline(&frp);
+        }
+        return VK_SUCCESS;
+    };
 };
+
+#endif // __VISUAL_HPP__

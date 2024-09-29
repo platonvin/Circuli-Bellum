@@ -1,8 +1,11 @@
-# .ONESHELL:
+.ONESHELL:
 
 #setting up include and lib directories for dependencies
-I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include
+I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include -Itw-colors-cpp
 L = -Llum-al/lib -Lbox2d/build/src/
+
+# CPP_COMPILER = g++
+CPP_COMPILER = clang++
 
 STATIC_OR_DYNAMIC = 
 REQUIRED_LIBS = -llumal -lglfw3 -lvolk -lraylib -lgdi32 -lwinmm -lbox2d
@@ -20,26 +23,18 @@ crazy_flags   = -flto -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8
 
 SHADER_FLAGS = --target-env=vulkan1.1 -g -O
 
-deb_objs := \
-	obj/deb/main.o\
-	obj/deb/physics.o\
-	obj/deb/visual.o\
-	obj/deb/logic.o\
-
-rel_objs := \
-	obj/rel/main.o\
-	obj/rel/physics.o\
-	obj/rel/visual.o\
-	obj/rel/logic.o\
-
 srcs := \
 	src/main.cpp\
 	src/physics.cpp\
 	src/visual.cpp\
 	src/logic.cpp\
+	src/input.cpp\
+
+deb_objs := $(patsubst src/%.cpp, obj/deb/%.o, $(srcs))
+rel_objs := $(patsubst src/%.cpp, obj/rel/%.o, $(srcs))
 
 #default target
-all: init vcpkg_installed_eval lum-al/lib/liblumal.a release
+all: setup release
 
 #rule for re-evaluation after vcpkg_installed created
 .PHONY: vcpkg_installed_eval 
@@ -54,14 +49,17 @@ vcpkg_installed_eval: vcpkg_installed
 	$(eval GLSLC_DIR := $(firstword $(foreach dir, $(OTHER_DIRS), $(wildcard $(dir)/tools/shaderc))) )
 	$(eval GLSLC := $(strip $(GLSLC_DIR))/glslc )
 
+setup: init vcpkg_installed_eval lum-al/lib/liblumal.a
 #If someone knows a way to simplify this, please tell me 
-obj/rel/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-	c++ $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
+obj/rel/%.o: setup
+obj/rel/%.o: src/%.cpp
+	$(CPP_COMPILER) $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(rel_objs:.o=.d)
 -include $(DEPS)
 
-obj/deb/%.o: src/%.cpp init vcpkg_installed_eval lum-al/lib/liblumal.a
-	c++ $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
+obj/deb/%.o: setup
+obj/deb/%.o: src/%.cpp
+	$(CPP_COMPILER) $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(deb_objs:.o=.d)
 -include $(DEPS)
 
@@ -81,17 +79,18 @@ shaders: vcpkg_installed_eval $(_TARGETS)
 
 debug: init vcpkg_installed_eval shaders $(deb_objs) build_deb 
 ifeq ($(OS),Windows_NT)
-	.\client
+	.\client_deb
 else
-	./client
+	./client_deb
 endif
 	
 release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_rel 
 ifeq ($(OS),Windows_NT)
-	.\client
+	.\client_rel
 else
-	./client
+	./client_rel
 endif
+
 
 lum-al/lib/liblumal.a: vcpkg_installed
 	git submodule init
@@ -105,15 +104,15 @@ only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(rel_objs) 
 
 #crazy fast
 crazy: init vcpkg_installed_eval shaders
-	c++ $(srcs) -o crazy_client $(crazy_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) $(srcs) -o crazy_client $(crazy_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 crazy_native: init vcpkg_installed_eval shaders
-	c++ $(srcs) -o crazy_client $(crazy_flags) -march=native $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) $(srcs) -o crazy_client $(crazy_flags) -march=native $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 
 #i could not make it work without this
-build_deb: init vcpkg_installed_eval lum-al/lib/liblumal.a $(deb_objs)
-	c++ -o client $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
-build_rel: init vcpkg_installed_eval lum-al/lib/liblumal.a $(rel_objs) 
-	c++ -o client $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+build_deb: setup $(deb_objs)
+	c++ -o client_deb $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+build_rel: setup $(rel_objs) 
+	c++ -o client_rel $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 
 fun:
 	@echo -e '\033[0;36m' fun was never an option '\033[0m'

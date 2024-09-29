@@ -1,7 +1,12 @@
 /vcpkg_installed
 /obj
 /compile_flags.txt
-/client.exe
+client.exe
+client_rel.exe
+client_deb.exe
 /shaders/compiled
 /code.cpp
 /todo.txt
+/src/svec.hpp
+/tasklist.txt
+/gcm.cache/C-/msys64/mingw64/include/c++/13.2.0/x86_64-w64-mingw32/bits

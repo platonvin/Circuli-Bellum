@@ -2,17 +2,12 @@
 #include <glm/glm.hpp>
 using namespace glm;
 
+// #include "GLFW/glfw3.h"
+// #include "macros.hpp"
+#define GLFW_INCLUDE_NONE
 #include "logic.hpp"
 
-#define l() std::cout << __FILE__ <<":" << __LINE__ << " " << __FUNCTION__ << "() " "\n";
-#define pl(x) std::cout << ":" << __LINE__ << " " << __FUNCTION__ << "() " #x " " << x << "\n";
-#define apl(x) std::cout << ":" << __LINE__ << " " << __FUNCTION__ << "() " #x " " << x << "\n";
-
-#define l()
-// #define pl(x)
-// #define apl(x)
-
-#define let auto
+// #define let auto&
 
 int main() {
     const int screenWidth = 800;
@@ -24,16 +19,22 @@ int main() {
     // SetTargetFPS(60);
 l()
     LogicalScene logic = {};
-    logic.create();
+    logic.create(0);
 
 l()
-    logic.addPlayer({0.03,100.123}, 10, 100);
-    logic.addScenery({0.01,0.02}, 10, 100);
+    logic.addNewPlayer();
+l()
+    logic.addScenery(Scenery(Square, {.SQUARE_half_width=1, .SQUARE_half_height=3}, vec2(0), false));
+l()
     // Main loop
-
+    double previous = 0;
+    double current = 0;
     while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
-        logic.tick(0.016);
+        previous = current;
+        current = glfwGetTime();
+
+        logic.tick(current - previous);
     }
 
     // Clean up

@@ -5,7 +5,7 @@
 
 layout(location = 0) in uvec3 coloring_info;
 layout(location = 1) in uint shape_type;
-layout(location = 2) in vec2 local_pos;
+layout(location = 2) in vec2 global_pos;
 layout(location = 3) in float value_1; // used to make shape size
 layout(location = 4) in float value_2; // used to make shape size
 
@@ -24,6 +24,9 @@ const int Circle = 0;
 const int Square = Circle+1;
 const int Capsule = Square+1;
 
+//padding for smooth edges
+const float SIZE_MULTIPLIER = 1.02;
+
 // Shape is either circle, capsule or square (for now)
 vec2 get_shape_shift(){
     vec2 shift;
@@ -31,6 +34,7 @@ vec2 get_shape_shift(){
     if (shape_type == Circle) {
         // value_1 is radius
         shift = vec2(value_1);
+        shift *= SIZE_MULTIPLIER; //padding for smooth edges
     }
     else if (shape_type == Square) {
         // value_1 is width/2,  value_2 is height/2
@@ -39,8 +43,8 @@ vec2 get_shape_shift(){
     else if (shape_type == Capsule) {
         // value_1 is radius, value_2 is length/2
         shift = vec2(value_2 + value_1, value_1); // Horizontal length + radius at both ends
+        shift *= SIZE_MULTIPLIER;
     }
-
     return shift;
 }
 
@@ -65,7 +69,8 @@ vec2 get_vertex_pos(){
 
 void main() 
 {
-    vec2 world_pos = local_pos + get_vertex_pos();
+    vec2 local_pos = get_vertex_pos();
+    vec2 world_pos = global_pos + local_pos;
     
     out_coloring_info = coloring_info;
     out_shape_type = shape_type;
