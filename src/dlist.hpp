@@ -1,4 +1,5 @@
 #pragma once
+#include <strstream>
 #ifndef DLIST_HPP
 #define DLIST_HPP
 
@@ -99,11 +100,19 @@ public:
     ListElemType* appendBack(const StoredClass& class_obj) {
         ListElemType* newElem = new ListElemType(class_obj);
         if (!_end) {
+            pl(_end);
+            pl(_start);
             _start = _end = newElem;
+            pl(_end);
+            pl(_start);
         } else {
+            pl(_end);
+            pl(_start);
             _end->next = newElem;
             newElem->prev = _end;
             _end = newElem;
+            pl(_end);
+            pl(_start);
         }
         return newElem;
     }
@@ -124,7 +133,7 @@ public:
     void printList() const {
         ListElemType* current = _start;
         while (current) {
-            std::cout << current->storage << " ";
+            std::cout << &current->storage << " ";
             current = current->next;
         }
         std::cout << std::endl;
@@ -148,7 +157,15 @@ public:
             return current != other.current;
         }
 
+        unsigned long long operator-(const Iterator& other) const {
+            return (unsigned long long)(void*)current - (unsigned long long)(void*)other.current;
+        }
+
+        operator void*(){
+            return current;
+        }
     private:
+
         ListElemType* current;
     };
 
@@ -189,5 +206,6 @@ public:
         return ReverseIterator(nullptr);
     }
 };
+
 
 #endif // DLIST_HPP

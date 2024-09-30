@@ -1,5 +1,4 @@
 #include "logic.hpp"
-#include "twpp.hpp"
 #include "macros.hpp"
 
 #define println printf("%s:%d: Fun: %s\n", __FILE__, __LINE__, __FUNCTION__);
@@ -36,9 +35,15 @@ void LogicalScene::removeAllProjectiles(){
 // when world is cleared and new one created
 // players travel between worlds, everything else doesnt
 void LogicalScene::addPlayerToWorld(Player* player) {
+    assert(player);
     b2Circle player_circle = {};
         player_circle.radius = player->props.radius;
-    assert(player);
+    // b2BodyDef bodyDef = b2DefaultBodyDef();
+    //     bodyDef.type = player->actor.properties.body_type;
+    //     bodyDef.position = glm2b(player->actor.state.pos);
+    // b2ShapeDef shapeDef = b2DefaultShapeDef();
+    //     shapeDef.enableHitEvents = true;
+
     world.addActor<b2Circle, b2CreateCircleShape>(&player->actor.bindings, &player->actor.state, &player->actor.properties, player, &player_circle);
 }
 void LogicalScene::addSceneryToWorld(Scenery* scenery, const std::vector<b2Vec2>& vertices) {
@@ -59,13 +64,24 @@ void LogicalScene::addProjectileToWorld(Projectile* projectile) {
 
 void LogicalScene::addNewPlayer(/*some visual props*/){
     Player player = Player(1, 4.2);
-    player.actor.state.pos.y = 12.0;
+    player.actor.state.pos.y = 8.0;
     player.props.radius = 1.0;
-        apl((int)player.actor.properties.color.r)
-        apl((int)player.actor.properties.color.g)
-        apl((int)player.actor.properties.color.b)
+        apl((int)player.actor.state.pos.x)
+        apl((int)player.actor.state.pos.y)
+        // apl((int)player.actor.properties.color.r)
+        // apl((int)player.actor.properties.color.g)
+        // apl((int)player.actor.properties.color.b)
+    // pl((void*)(players.end()))
+    // pl((void*)(players.begin()))
+    // pl(players.end() - players.begin())
     ListElem<Player>* new_player = players.appendBack(player);
+    // pl(new_player->obj())
     addPlayerToWorld(new_player->obj());
+    // pl((void*)(players.end()))
+    // pl((void*)(players.begin()))
+    // pl(players.end() - players.begin())
+    players.printList();
+    // abort();
 }
 void LogicalScene::removeAllPlayers(){
     for(auto& p : players){
@@ -86,9 +102,17 @@ void LogicalScene::setupActionCallbacks() {
     // input.rebindKey(Action::Jump, GLFW_KEY_SPACE);
     input.setActionCallback(Action::Jump, 
         [this](Action action) -> void {
-            world.applyImpulse(players._start->obj()->actor.bindings.body, 
-                b2Vec2(0,20.0));
-        al()
+            Player* p = players._start->obj();
+            // if(p->state.jumps_left > 0){
+            // if(p->state.has_jump){
+                world.applyImpulse(p->actor.bindings.body, 
+                    b2Vec2(0,20.0));
+                // b2set
+                // p->state.jumps_left--;
+                // p->state.has_jump = false;
+            // al()
+            // }
+            al()
         }
     );
     input.setActionCallback(Action::MoveLeft, 
@@ -96,20 +120,20 @@ void LogicalScene::setupActionCallbacks() {
             world.applyForce(players._start->obj()->actor.bindings.body, 
                 b2Vec2(-20.f,0.1));
             
-        al()
+        // al()
         }
     );
     input.setActionCallback(Action::MoveRight, 
         [this](Action action) -> void {
             world.applyForce(players._start->obj()->actor.bindings.body, 
                 b2Vec2(+20.f,0.1));
-        al()
+        // al()
         }
     );
 }
 void LogicalScene::create(int player_count) {
     world.create();
-    view.init();
+    view.init(); 
 
     for(int i=0; i<player_count; i++){
         addNewPlayer();
@@ -126,70 +150,80 @@ void LogicalScene::destroy(void) {
     removeAllScenery();
     removeAllProjectiles();
     world.destroy();
+    view.cleanup();
+    input.cleanup();
 }
 
-void LogicalScene::tick(float dTime) {
-    //first to be more responsive
-    input.pollUpdates();
-    
-    world.step(dTime);
-
-l()
-    b2BodyEvents bodyEvents = world.GetBodyEvents();
-    b2ContactEvents contacts = world.GetContactEvents();
-l()
-
-    for(int i=0; i<contacts.beginCount; i++){
-l()
-        auto touch = contacts.beginEvents[i];
-l() 
-        std::cout <<"A: "<< touch.shapeIdA.index1 <<" B: " << touch.shapeIdB.index1 <<'\n';
-        assert(b2Shape_GetUserData(touch.shapeIdA));
-        assert(b2Shape_GetUserData(touch.shapeIdB));
-        ActorType typeA = ((Actor*)b2Shape_GetUserData(touch.shapeIdA))->actorType;
-l()
-        ActorType typeB = ((Actor*)b2Shape_GetUserData(touch.shapeIdB))->actorType;
-l()
-        std::cout <<"BEGIN: "<< typeA <<" : " << typeB <<'\n';
-l()
+void LogicalScene::processBeginEvents(b2ContactEvents contacts){ 
+    auto beginProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
         switch (typeA | typeB) {
-            case (ActorType::Player|ActorType::Player):{break;}
-            case (ActorType::Scenery|ActorType::Scenery):{break;}
-            case (ActorType::Projectile|ActorType::Projectile):{
-                //destroy both | weak one
-                break;
-            }
-
-            case (ActorType::Player|ActorType::Scenery):{
-                //extra knockbak to player? Stun
-                // b2Shape_GetBody(touch.shapeIdA);
-                // b2Body_GetContactData()
-                break;
-            }
-            case (ActorType::Projectile|ActorType::Player):{
-                //dmg+destroy / shield bounce
-                break;
-            }
-            case (ActorType::Projectile|ActorType::Scenery):{
-                //destroy / bounce
+            case (ActorType::Player | ActorType::Scenery): {
+                Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
+                player->state.touching_grass = true;
+                // player->state.last_jmp_refill = glfwGetTime(); //TODO?
                 break;
             }
             default:
-                assert(false && "WRONG AT|AT");
-        }        
-    }
+                std::cerr << "wrong ActorType combination in beginEvent\n";
+                break;
+        }
+    };
 
-l()
-    for(int i=0; i<bodyEvents.moveCount; i++){
-        auto& move = bodyEvents.moveEvents[i];
+    for (int i = 0; i < contacts.beginCount; ++i) {
+        pl("begin")
+        processCollisionEvent(contacts.beginEvents[i], beginProcessor);
+    }
+}
+void LogicalScene::processEndEvents(b2ContactEvents contacts){ 
+    auto endProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
+        switch (typeA | typeB) {
+            case (ActorType::Player | ActorType::Scenery): {
+                Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
+                // player->state.touching_grass = false;
+                break;
+            }
+            default:
+                std::cerr << "wrong ActorType combination in endEvent\n";
+                break;
+        }
+    };
+
+    for (int i = 0; i < contacts.endCount; ++i) {
+        pl("end")
+        // l()
+        processCollisionEvent(contacts.endEvents[i], endProcessor);
+    }
+}
+void LogicalScene::processHitEvents(b2ContactEvents contacts){ 
+    auto contactProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
+        switch (typeA | typeB) {
+            default:
+                std::cerr << "wrong ActorType combination in hitEvent\n";
+                break;
+        }
+    };
+
+    for (int i = 0; i < contacts.hitCount; ++i) {
+        // l()
+        processCollisionEvent(contacts.hitEvents[i], contactProcessor);
+    }
+}
+
+void LogicalScene::processMoveEvents(b2BodyEvents moves){
+    for(int i=0; i<moves.moveCount; i++){
+        auto& move = moves.moveEvents[i];
         // Actually, it is pointer to Player/Scenery/Projectile, but Actor is thir first member
         Actor* actor = (Actor*)move.userData; 
         assert(actor);
         actor->state.pos = b2glm(move.transform.p);
         actor->state.rot = b2glm(move.transform.q);
 
-        //limiting speed. TODO move away
+        // pl(actor->actorType);
+        
+        //updating player TODO move away
         if(actor->actorType == ActorType::Player){
+            Player* player = (Player*)actor; 
+
             vec2 current_vel = world.getVelocity(actor->bindings.body);
             vec2 desired_vel = vec2(1);
             float current_len = glm::length(current_vel);
@@ -200,29 +234,69 @@ l()
                 world.applyForce(players._start->obj()->actor.bindings.body, 
                     glm2b(force_direction*ldiff*2.0f));
             }
-        }
-    }
+            pl(player->state.touching_grass);
+            // pl(player->state.jumps_left);
+            pl("after");
 
-l()
-    //TODO
+            if(player->state.touching_grass){
+                // if
+                player->state.has_jump = true;
+                //if enough time passed since lasss time refilled jumps
+                // if(glfwGetTime() - player->state.last_jmp_refill >= 0.01){
+                    // player->state.jumps_left = player->props.max_jumps;
+                    // player->state.last_jmp_refill = glfwGetTime();
+                // }
+            }
+            pl(player->state.touching_grass);
+            // pl(player->state.jumps_left);
+            pl(player->state.has_jump);
+        }
+        /*
+        what i want is:
+        jump refilled whhen:
+            in contact with surface and not jumped away from it
+            so, basically
+        */
+    }
+}
+
+
+void LogicalScene::tick(float dTime) {
+    //first to be more responsive
+    pl("\ntick start");
+    input.pollUpdates();
+
+    world.step(dTime);
+    // pl(players._start->obj()->state.has_jump);
+    b2BodyEvents bodyEvents = world.GetBodyEvents();
+    b2ContactEvents contacts = world.GetContactEvents();
+    pl(players._start->obj()->state.touching_grass);
+    processBeginEvents(contacts);
+    pl(players._start->obj()->state.touching_grass);
+    processEndEvents(contacts);
+    processHitEvents(contacts);
+    pl(players._start->obj()->state.touching_grass);
+    processMoveEvents(bodyEvents);
+    pl(players._start->obj()->state.has_jump);
+
     // -y to invert vertically
     view.camera.cameraScale = {1920/float(1080)*10.0, -1*10.0};
 
     view.start_frame();
         view.start_main_pass();
 
-l()
+// l()
     // Draw everything. Basically reorders memory in specific buffers for GPU convenience
-    for(auto p : players){
+    for(let p : players){
         view.draw_dynamic_shape(p.constructShape(), SolidColor);
     }
-    for(auto s : sceneries){
+    for(let s : sceneries){
         view.draw_dynamic_shape(s.constructShape(), SolidColor);
     }
-    for(auto p : projectiles){
+    for(let p : projectiles){
         view.draw_dynamic_shape(p.constructShape(), SolidColor);
     }
-l()
+// l()
 
     view.end_main_pass();
     
@@ -230,6 +304,15 @@ l()
 // println
     view.end_frame();
 // println
+    pl("tick end\n");
+
+    /*
+    in contact
+    if has jump:    
+        jump
+        now has NO jump
+    still in contact
+    */
 }
 
 Shape Actor::constructActorShape(){
@@ -244,6 +327,9 @@ Shape Player::constructShape(){
         shape.shapeType = Circle;
         //overwrites
         shape.props.CIRCLE_radius = props.radius;
+    // pl(shape.pos.x);
+    // pl(shape.pos.y);
+    // pl(shape.props.CIRCLE_radius);
     return shape;
 }
 Shape Scenery::constructShape(){

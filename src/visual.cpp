@@ -29,8 +29,8 @@ void VisualView::init() {
     createShapeBuffers();    
     createUniformBuffer();    
     createSamplers();
-    // Initialize other resources
 
+    // Initialize swapchain dependent resources
     createSwapchainDependent();
 
     render.createSwapchainDependent = createSwapchainDependent;
@@ -42,6 +42,8 @@ void VisualView::cleanup(void) {
     render.deviceWaitIdle();
     cleanupSwapchainDependent();
     render.deleteBuffers(&uniform);
+    render.deleteBuffers(&staticShapeBuffer);
+    render.deleteBuffers(&dynamicShapeBuffer);
     render.cleanup();
 }
 
@@ -56,10 +58,10 @@ void VisualView::setupDescriptors(void) {
             .defer();
     }
 
-    render.descriptorBuilder
-        .setLayout(&bloomPipe.setLayout)
-        .setDescriptorSets(&bloomPipe.sets)
-        .defer();
+    // render.descriptorBuilder
+    //     .setLayout(&bloomPipe.setLayout)
+    //     .setDescriptorSets(&bloomPipe.sets)
+    //     .defer();
 
     render.flushDescriptorSetup();
 }

@@ -55,7 +55,7 @@ public:
     // Adding different shapes automatically from params
     // Wrapping box2D functions
     template <typename b2shapeTypeTemplate, b2ShapeId Fun(b2BodyId, const b2ShapeDef*, const b2shapeTypeTemplate*)>
-    void addActor (PhysicalBindings* bind, PhysicalState* state, PhysicalProperties* props, void* user_data, b2shapeTypeTemplate* shape);
+    void addActor (PhysicalBindings* bind, PhysicalState* state, PhysicalProperties* props, void* user_data, b2shapeTypeTemplate* shape, b2BodyDef* bdef = nullptr, b2ShapeDef* sdef = nullptr);
 
     void applyForce(b2BodyId body, const b2Vec2& force);
     void applyImpulse(b2BodyId body, const b2Vec2& impulse);
@@ -79,9 +79,9 @@ private:
 };
 
 struct PhysicalState {
-    glm::vec2 pos = {};
-    glm::vec2 rot = {};
-    glm::vec2 vel = {};
+    glm::vec2 pos = glm::vec2(0);
+    glm::vec2 rot = glm::vec2(0);
+    glm::vec2 vel = glm::vec2(0);
 };
 struct PhysicalProperties {
     glm::u8vec3 color = twpp::purple(500);
@@ -91,22 +91,41 @@ struct PhysicalProperties {
     b2ShapeType shape_type = b2_circleShape;
 };
 struct PhysicalBindings {
-    b2BodyId body = {0};
-    b2ShapeId shape = {0};
-    b2ShapeId sensor = {0};
+    b2BodyId body = {};
+    b2ShapeId shape = {};
+    b2ShapeId sensor = {};
 };
 
 template <typename b2shapeTypeTemplate, b2ShapeId Fun(b2BodyId, const b2ShapeDef*, const b2shapeTypeTemplate*)>
-void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, PhysicalProperties* props, void* user_data, b2shapeTypeTemplate* shape){
-    b2BodyDef bodyDef = b2DefaultBodyDef();
+void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, PhysicalProperties* props, void* user_data, b2shapeTypeTemplate* shape, b2BodyDef* bdef, b2ShapeDef* sdef){
+    b2BodyDef bodyDef;
+    if(bdef == nullptr){
+        bodyDef = b2DefaultBodyDef();
+    } else {
+        bodyDef = *bdef;
+    }
     apl(props->body_type)
-        bodyDef.type = props->body_type;
-        bodyDef.position = glm2b(state->pos);
+    bodyDef.type = props->body_type;
+    bodyDef.position = glm2b(state->pos);
+    bodyDef.isAwake = true;
+    bodyDef.isEnabled = true;
+    bodyDef.enableSleep = false;
+    bodyDef.sleepThreshold = 0;
 
-    b2ShapeDef shapeDef = b2DefaultShapeDef();
     bind->body = b2CreateBody(world_id, &bodyDef);
     assert(bind);
     assert(b2Body_IsValid(bind->body));
+    // if(sdef == nullptr){
+    // }
+    b2ShapeDef shapeDef;
+    if(sdef == nullptr){
+        shapeDef = b2DefaultShapeDef();
+    } else {
+        shapeDef = *sdef;
+    }
+    shapeDef.enableContactEvents = true;
+    shapeDef.density = 1;
+
     bind->shape = Fun(bind->body, &shapeDef, shape);
     pl(bind->body.index1)
     pl(bind->shape.index1)

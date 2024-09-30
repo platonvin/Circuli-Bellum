@@ -64,8 +64,8 @@ public:
 
     Actor(ActorType actorType, b2BodyType bodyType, b2ShapeType shapeType, u8vec3 coloring_info, vec2 pos, ShapeProps shapeProps) : 
         actorType{actorType}, 
-        properties{ .color=coloring_info, .body_type=bodyType, .shape_type=shapeType},
         state{.pos=pos},
+        properties{ .color=coloring_info, .body_type=bodyType, .shape_type=shapeType},
         shapeProps(shapeProps) {}
 
     Shape constructActorShape();
@@ -80,12 +80,18 @@ public:
         props{.mass=mass, .radius=radius} {}
     
     struct player_state{
-        double hp;
+        double hp_left=100;
+        // int jumps_left=0;
+        // how much time after last jump refresh passed, in seconds
+        // double last_jmp_refill = 0.0;
+        bool touching_grass=false;
+        bool has_jump = false;
     } state;
     struct player_props{
-        double hp;
-        float mass;
-        float radius;
+        double hp = 100;
+        float mass = 1.0f;
+        float radius = 1.0;
+        int max_jumps = 1;
     } props;
 
     Shape constructShape();
@@ -142,13 +148,13 @@ enum class SceneState {
 // TODO: separate menu from game (or should i?)
 class LogicalScene {
 public:
-    PhysicalWorld world;
-    VisualView view;
-    InputHandler input;
+    PhysicalWorld world = {};
+    VisualView view = {};
+    InputHandler input = {};
     // for projectiles, it is perfomance requirement. Others are in list for structural coherence
-    List<Player> players;
-    List<Scenery> sceneries;
-    List<Projectile> projectiles;
+    List<Player> players = {};
+    List<Scenery> sceneries = {};
+    List<Projectile> projectiles = {};
 
     // std::vector<hit> hits
     void create(int player_count = 1);
@@ -181,6 +187,27 @@ public:
     void clearWorld(void);
 
     SceneState current_state;
+
+private:
+
+    using collisionProcessFun = std::function<void(ActorType, void*, ActorType, void*)>;
+    // template <typename b2ContactEvent> 
+    void processCollisionEvent(auto& touch, collisionProcessFun caseProcessor) {
+        // std::cout << "A: " << touch.shapeIdA.index1 << " B: " << touch.shapeIdB.index1 << '\n';
+        void* udataA = b2Shape_GetUserData(touch.shapeIdA);
+        void* udataB = b2Shape_GetUserData(touch.shapeIdB);
+        assert(udataA && udataB);
+        ActorType typeA = static_cast<Actor*>(udataA)->actorType;
+        ActorType typeB = static_cast<Actor*>(udataB)->actorType;
+        caseProcessor(typeA, udataA, typeB, udataB); 
+    }
+
+    void processBeginEvents(b2ContactEvents contacts);
+    void processEndEvents(b2ContactEvents contacts);
+    void processHitEvents(b2ContactEvents contacts);
+    void processMoveEvents(b2BodyEvents moves);
+
+    // double getTime() {return glfwGetTime();}
 };
 
 #endif // __LOGIC_HPP__

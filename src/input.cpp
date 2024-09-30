@@ -68,6 +68,7 @@ void InputHandler::attemptTriggerActionForGamepadButton(int button, bool isPress
 //required for gamepads. Keyboards are handled via callback
 void InputHandler::pollUpdates() {
     for(int act=0; act<to_underlying(Action::LAST_ACTION); act++){
+        
         updateActionState((Action)act, currentActionStates[act]);
     }
     if (glfwGetGamepadState(GLFW_JOYSTICK_1, &gState)) {

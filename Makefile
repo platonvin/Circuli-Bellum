@@ -4,21 +4,21 @@
 I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include -Itw-colors-cpp
 L = -Llum-al/lib -Lbox2d/build/src/
 
-# CPP_COMPILER = g++
-CPP_COMPILER = clang++
+CPP_COMPILER = g++
+# CPP_COMPILER = clang++
 
 STATIC_OR_DYNAMIC = 
-REQUIRED_LIBS = -llumal -lglfw3 -lvolk -lraylib -lgdi32 -lwinmm -lbox2d
+REQUIRED_LIBS = -llumal -lglfw3 -lvolk -lbox2d
 ifeq ($(OS),Windows_NT)
-	REQUIRED_LIBS += -lgdi32       
+	REQUIRED_LIBS += -lgdi32 -lwinmm
 	STATIC_OR_DYNAMIC += -static
 else
 	REQUIRED_LIBS += -lpthread -ldl
 endif
 	
-always_enabled_flags = -fno-exceptions -Wuninitialized -std=c++20
-debug_flags   = -O0 -g $(always_enabled_flags)
-release_flags = -Ofast -DVKNDEBUG -mmmx -msse4.2 -mavx -mpclmul -fdata-sections -ffunction-sections -s -mfancy-math-387 -fno-math-errno -Wl,--gc-sections $(always_enabled_flags)
+always_enabled_flags = -fno-exceptions -std=c++20
+debug_flags   = -O0 -g
+release_flags = -Ofast -mmmx -msse4.2 -mavx -mpclmul
 crazy_flags   = -flto -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8 -D_GLIBCXX_PARALLEL -funroll-loops -w $(release_flags)
 
 SHADER_FLAGS = --target-env=vulkan1.1 -g -O
@@ -53,13 +53,13 @@ setup: init vcpkg_installed_eval lum-al/lib/liblumal.a
 #If someone knows a way to simplify this, please tell me 
 obj/rel/%.o: setup
 obj/rel/%.o: src/%.cpp
-	$(CPP_COMPILER) $(release_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
+	$(CPP_COMPILER) $(release_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(rel_objs:.o=.d)
 -include $(DEPS)
 
 obj/deb/%.o: setup
 obj/deb/%.o: src/%.cpp
-	$(CPP_COMPILER) $(debug_specific_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
+	$(CPP_COMPILER) $(debug_flags) $(always_enabled_flags) $(I) $(args) -MMD -MP -c $< -o $@
 DEPS = $(deb_objs:.o=.d)
 -include $(DEPS)
 
@@ -111,8 +111,10 @@ crazy_native: init vcpkg_installed_eval shaders
 #i could not make it work without this
 build_deb: setup $(deb_objs)
 	c++ -o client_deb $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+# strip .\client_deb.exe
 build_rel: setup $(rel_objs) 
 	c++ -o client_rel $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+# strip .\client_rel.exe
 
 fun:
 	@echo -e '\033[0;36m' fun was never an option '\033[0m'
@@ -163,17 +165,15 @@ endif
 
 clean: init
 ifeq ($(OS),Windows_NT)
-	del "obj\*.o"
-	del "obj\deb\*.o"
-	del "obj\rel\*.o"
-	del "shaders\compiled\*.spv"
-	del "lum-al\lib\*.a"
+	-del "obj\*.o"
+	-del "obj\deb\*.o"
+	-del "obj\rel\*.o"
+	-del "shaders\compiled\*.spv"
 else
-	rm -R obj/*.o
-	rm -R obj/deb/*.o 
-	rm -R obj/rel/*.o 
-	rm -R shaders/compiled/*.spv 
-	rm -R lum-al/lib/*.a
+	-rm -R obj/*.o
+	-rm -R obj/deb/*.o 
+	-rm -R obj/rel/*.o 
+	-rm -R shaders/compiled/*.spv 
 endif
 
 # mkdir obj

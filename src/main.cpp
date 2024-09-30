@@ -10,13 +10,6 @@ using namespace glm;
 // #define let auto&
 
 int main() {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
-    vec2 ssize = vec2(screenWidth, screenHeight);
-
-    // SetTraceLogLevel(LOG_WARNING);
-    // InitWindow(screenWidth, screenHeight, "Box2D - Physics Simulation");
-    // SetTargetFPS(60);
 l()
     LogicalScene logic = {};
     logic.create(0);
@@ -31,10 +24,13 @@ l()
     double current = 0;
     while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
-        previous = current;
         current = glfwGetTime();
+        if((current - previous) > 0.10){
 
-        logic.tick(current - previous);
+            logic.tick(current - previous);
+            
+            previous = current;
+        }
     }
 
     // Clean up

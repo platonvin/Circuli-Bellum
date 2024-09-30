@@ -126,6 +126,7 @@ public:
         copyCommandBuffers = {};
         for(let frp : fillerPipes){
             frp = {};
+            l();
         }
         
         render.createCommandBuffers(&graphicsCommandBuffers, render.settings.fif);
@@ -154,6 +155,7 @@ public:
         for(let frp : fillerPipes){
             render.destroyRasterPipeline(&frp);
         }
+        // render.destroyRasterPipeline(&bloomPipe);
         return VK_SUCCESS;
     };
 };

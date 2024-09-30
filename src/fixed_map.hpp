@@ -6,6 +6,7 @@
 #include <macros.hpp>
 
 //TODO version with NONE elem as the one that is invalid
+//NONE element is the one that is invalid
 
 //For enums
 template <typename T>
@@ -23,7 +24,6 @@ constexpr NonEnumType to_underlying(NonEnumType e) noexcept requires IsNotEnum<N
     return (e);
 }
 
-//NONE element is the one that is invalid
 template <auto EnumSize, typename Type>
 class FixedMap {
     //basically exists to allow enum size
@@ -69,7 +69,10 @@ public:
 
     void clear() {
         memset(data, 0, sizeof(data));
-        memset(presence, 0, sizeof(presence));
+        for(int i=0; i<to_underlying(Size); i++){
+            data[i] = {};
+            presence[i] = false;
+        }
     }
 
     class iterator {

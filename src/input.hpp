@@ -55,13 +55,11 @@ class InputHandler {
 public:
     InputHandler();
 
-    // void update() {
-    //     updateActionState()
-    // }
-    //required for gamepads. Keyboards are handled via callback. Also called in update()
+    //required for gamepads. Keyboards are handled via callback
     void pollUpdates();
     
     void setup(GLFWwindow* window);
+    void cleanup() {}
     
     void rebindKey(Action action, int newKey);
 
