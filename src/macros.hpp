@@ -15,6 +15,7 @@
 #ifndef UNDEF_L_PL
     #define l() std::cout << __FILE__ <<":" << __LINE__ << " " << __FUNCTION__ << "() " "\n";
     #define pl(x) std::cout << __FILE__ << ":" << __LINE__ << " " << __FUNCTION__ << "() " #x " " << x << "\n";
+    #define npl(x) std::cout << " :" << __LINE__ << " " #x " "  << x << "\n";
 #else
     #define l()
     #define pl(x)

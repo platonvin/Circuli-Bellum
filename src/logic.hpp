@@ -81,11 +81,14 @@ public:
     
     struct player_state{
         double hp_left=100;
-        // int jumps_left=0;
+        int jumps_left=1;
         // how much time after last jump refresh passed, in seconds
         // double last_jmp_refill = 0.0;
         bool touching_grass=false;
-        bool has_jump = false;
+        /*
+        so there is 1 frame delay between jumping and touching grass set to false
+        */
+        bool refill_jumps_next_frame = false;
     } state;
     struct player_props{
         double hp = 100;

@@ -25,7 +25,7 @@ l()
     while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
         current = glfwGetTime();
-        if((current - previous) > 0.10){
+        if((current - previous) > 0.01){
 
             logic.tick(current - previous);
             

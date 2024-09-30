@@ -104,15 +104,20 @@ void LogicalScene::setupActionCallbacks() {
         [this](Action action) -> void {
             Player* p = players._start->obj();
             // if(p->state.jumps_left > 0){
-            // if(p->state.has_jump){
+            if(p->state.jumps_left > 0){
                 world.applyImpulse(p->actor.bindings.body, 
                     b2Vec2(0,20.0));
+                auto t = b2Body_GetTransform(p->actor.bindings.body);
+                // t.p.y += 1.1;
+                b2Body_SetTransform(p->actor.bindings.body, t.p, t.q);
+                npl("JUMP");
                 // b2set
                 // p->state.jumps_left--;
-                // p->state.has_jump = false;
-            // al()
-            // }
-            al()
+                p->state.jumps_left--;
+
+                //so not updated from previous
+                p->state.refill_jumps_next_frame = false;
+            }
         }
     );
     input.setActionCallback(Action::MoveLeft, 
@@ -156,6 +161,8 @@ void LogicalScene::destroy(void) {
 
 void LogicalScene::processBeginEvents(b2ContactEvents contacts){ 
     auto beginProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
+        pl(typeA);
+        pl(typeB);
         switch (typeA | typeB) {
             case (ActorType::Player | ActorType::Scenery): {
                 Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
@@ -176,10 +183,14 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
 }
 void LogicalScene::processEndEvents(b2ContactEvents contacts){ 
     auto endProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
+        pl(typeA);
+        pl(typeB);
         switch (typeA | typeB) {
             case (ActorType::Player | ActorType::Scenery): {
                 Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
-                // player->state.touching_grass = false;
+                player->state.touching_grass = false;
+                //if end event, we are in fact not touching grass and should not refill
+                player->state.refill_jumps_next_frame = false;
                 break;
             }
             default:
@@ -196,6 +207,9 @@ void LogicalScene::processEndEvents(b2ContactEvents contacts){
 }
 void LogicalScene::processHitEvents(b2ContactEvents contacts){ 
     auto contactProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
+        pl(typeA);
+        pl(typeB);
+
         switch (typeA | typeB) {
             default:
                 std::cerr << "wrong ActorType combination in hitEvent\n";
@@ -219,7 +233,7 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves){
         actor->state.rot = b2glm(move.transform.q);
 
         // pl(actor->actorType);
-        
+        pl(actor->actorType);
         //updating player TODO move away
         if(actor->actorType == ActorType::Player){
             Player* player = (Player*)actor; 
@@ -238,18 +252,18 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves){
             // pl(player->state.jumps_left);
             pl("after");
 
+            //like its next frame. TODO: box2d end event on the same tick?
+            if(player->state.refill_jumps_next_frame){
+                player->state.jumps_left = player->props.max_jumps;
+                player->state.refill_jumps_next_frame = false;
+            }
             if(player->state.touching_grass){
-                // if
-                player->state.has_jump = true;
-                //if enough time passed since lasss time refilled jumps
-                // if(glfwGetTime() - player->state.last_jmp_refill >= 0.01){
-                    // player->state.jumps_left = player->props.max_jumps;
-                    // player->state.last_jmp_refill = glfwGetTime();
-                // }
+                player->state.refill_jumps_next_frame = true;
+
             }
             pl(player->state.touching_grass);
             // pl(player->state.jumps_left);
-            pl(player->state.has_jump);
+            pl(player->state.refill_jumps_next_frame);
         }
         /*
         what i want is:
@@ -259,60 +273,71 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves){
         */
     }
 }
+/*
+input: jump
+no jumps
 
+on grass ? +1 : _
+
+end event:
+    
+*/
 
 void LogicalScene::tick(float dTime) {
     //first to be more responsive
-    pl("\ntick start");
-    input.pollUpdates();
+    if(glfwGetKey(view.render.window.pointer, GLFW_KEY_ENTER) == GLFW_PRESS){
+        pl("tick start");
+        input.pollUpdates();
+        
+        world.step(dTime);
+        b2BodyEvents bodyEvents = world.GetBodyEvents();
+        b2ContactEvents contacts = world.GetContactEvents();
+        // pl(players._start->obj()->state.has_jump);
+        pl(players._start->obj()->state.touching_grass);
+        processBeginEvents(contacts);
+        pl(players._start->obj()->state.touching_grass);
+        processEndEvents(contacts);
+        processHitEvents(contacts);
+        pl(players._start->obj()->state.touching_grass);
+        processMoveEvents(bodyEvents);
+        pl(players._start->obj()->state.refill_jumps_next_frame);
 
-    world.step(dTime);
-    // pl(players._start->obj()->state.has_jump);
-    b2BodyEvents bodyEvents = world.GetBodyEvents();
-    b2ContactEvents contacts = world.GetContactEvents();
-    pl(players._start->obj()->state.touching_grass);
-    processBeginEvents(contacts);
-    pl(players._start->obj()->state.touching_grass);
-    processEndEvents(contacts);
-    processHitEvents(contacts);
-    pl(players._start->obj()->state.touching_grass);
-    processMoveEvents(bodyEvents);
-    pl(players._start->obj()->state.has_jump);
 
-    // -y to invert vertically
-    view.camera.cameraScale = {1920/float(1080)*10.0, -1*10.0};
+        // -y to invert vertically
+        view.camera.cameraScale = {1920/float(1080)*10.0, -1*10.0};
 
-    view.start_frame();
-        view.start_main_pass();
+        view.start_frame();
+            view.start_main_pass();
 
-// l()
-    // Draw everything. Basically reorders memory in specific buffers for GPU convenience
-    for(let p : players){
-        view.draw_dynamic_shape(p.constructShape(), SolidColor);
+    // l()
+        // Draw everything. Basically reorders memory in specific buffers for GPU convenience
+        for(let p : players){
+            view.draw_dynamic_shape(p.constructShape(), SolidColor);
+        }
+        for(let s : sceneries){
+            view.draw_dynamic_shape(s.constructShape(), SolidColor);
+        }
+        for(let p : projectiles){
+            view.draw_dynamic_shape(p.constructShape(), SolidColor);
+        }
+    // l()
+
+        view.end_main_pass();
+        
+        // view.bloom_pass();
+    // println
+        view.end_frame();
+    // println
+        pl("tick end\n");
+
+        /*
+        in contact
+        if has jump:    
+            jump
+            now has NO jump
+        still in contact
+        */
     }
-    for(let s : sceneries){
-        view.draw_dynamic_shape(s.constructShape(), SolidColor);
-    }
-    for(let p : projectiles){
-        view.draw_dynamic_shape(p.constructShape(), SolidColor);
-    }
-// l()
-
-    view.end_main_pass();
-    
-    // view.bloom_pass();
-// println
-    view.end_frame();
-// println
-    pl("tick end\n");
-
-    /*
-    in contact
-    if has jump:    
-        jump
-        now has NO jump
-    still in contact
-    */
 }
 
 Shape Actor::constructActorShape(){
