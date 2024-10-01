@@ -29,6 +29,7 @@
     #define apl(x)
 #endif
 
+//assert index < size with nice look
 #define validate_bounds(index,size) \
     if(!(index < size)){\
         std::cout << "index " #index "=" << (index) << " is not in bounds of " #size "=" << (size) << "\n";\

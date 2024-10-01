@@ -69,7 +69,7 @@ public:
     Camera camera = {};
 
     // Store a pair of RasterPipe and coloringType
-    void init ();
+    void setup ();
     void cleanup();
     void createImages();
     void createSwapchainDependentImages();

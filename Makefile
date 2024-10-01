@@ -16,9 +16,11 @@ else
 	REQUIRED_LIBS += -lpthread -ldl
 endif
 	
-always_enabled_flags = -fno-exceptions -std=c++20
-debug_flags   = -O0 -g
-release_flags = -Ofast -mmmx -msse4.2 -mavx -mpclmul
+always_enabled_flags = -fno-exceptions -std=c++20 -flto
+debug_flags   = -O0 -g 
+# TODO -fsanitize=undefined
+release_flags = -Os -mmmx -msse4 -mpclmul -s -flto
+
 crazy_flags   = -flto -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8 -D_GLIBCXX_PARALLEL -funroll-loops -w $(release_flags)
 
 SHADER_FLAGS = --target-env=vulkan1.1 -g -O
@@ -29,6 +31,9 @@ srcs := \
 	src/visual.cpp\
 	src/logic.cpp\
 	src/input.cpp\
+	src/actors/player.cpp\
+	src/actors/projectile.cpp\
+	src/actors/scenery.cpp\
 
 deb_objs := $(patsubst src/%.cpp, obj/deb/%.o, $(srcs))
 rel_objs := $(patsubst src/%.cpp, obj/rel/%.o, $(srcs))
@@ -110,16 +115,16 @@ crazy_native: init vcpkg_installed_eval shaders
 
 #i could not make it work without this
 build_deb: setup $(deb_objs)
-	c++ -o client_deb $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) -o client_deb $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 # strip .\client_deb.exe
 build_rel: setup $(rel_objs) 
-	c++ -o client_rel $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) -o client_rel $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 # strip .\client_rel.exe
 
 fun:
 	@echo -e '\033[0;36m' fun was never an option '\033[0m'
 test:
-	c++ -pg test.cpp -o test -Wl,--stack,1000000
+	$(CPP_COMPILER) -pg test.cpp -o test -Wl,--stack,1000000
 	test
 
 pack:
@@ -167,17 +172,21 @@ clean: init
 ifeq ($(OS),Windows_NT)
 	-del "obj\*.o"
 	-del "obj\deb\*.o"
+	-del "obj\deb\*.d"
 	-del "obj\rel\*.o"
+	-del "obj\rel\*.d"
 	-del "shaders\compiled\*.spv"
 else
 	-rm -R obj/*.o
 	-rm -R obj/deb/*.o 
+	-rm -R obj/deb/*.d 
 	-rm -R obj/rel/*.o 
+	-rm -R obj/rel/*.d 
 	-rm -R shaders/compiled/*.spv 
 endif
 
 # mkdir obj
-init: obj obj/deb obj/rel shaders/compiled
+init: obj obj/deb obj/deb/actors obj/rel obj/rel/actors shaders/compiled
 obj:
 ifeq ($(OS),Windows_NT)
 	mkdir "obj"
@@ -192,11 +201,25 @@ else
 	mkdir -p obj/deb
 endif
 
+obj/deb/actors:
+ifeq ($(OS),Windows_NT)
+	mkdir "obj/deb/actors"
+else
+	mkdir -p obj/deb/actors
+endif
+
 obj/rel:
 ifeq ($(OS),Windows_NT)
 	mkdir "obj/rel"
 else
 	mkdir -p obj/rel
+endif
+
+obj/rel/actors:
+ifeq ($(OS),Windows_NT)
+	mkdir "obj/rel/actors"
+else
+	mkdir -p obj/rel/actors
 endif
 
 shaders/compiled:

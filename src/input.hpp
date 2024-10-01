@@ -1,4 +1,6 @@
 #pragma once
+#include "glm/ext/vector_double2.hpp"
+#include "glm/ext/vector_int2.hpp"
 #ifndef __CONTROLS_HPP__
 #define __CONTROLS_HPP__
 
@@ -6,8 +8,9 @@
 #include <functional>
 #include <iostream>
 
-#include "fixed_map.hpp"
-
+#include "data_structures/fixed_map.hpp"
+using glm::dvec2;
+using glm::ivec2;
 /*
 general structure:
     glfwCallback is called on an input event
@@ -62,14 +65,15 @@ public:
     void cleanup() {}
     
     void rebindKey(Action action, int newKey);
-
+    void rebindMouseButton(Action action, int newKey);
     void rebindGamepadButton(Action action, int newButton);
 
     void setActionCallback(Action action, const std::function<void(Action)>& callback);
+    // vec2 getMousePos() {return glfwgemo;}
 
 private:
     static void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-        auto* handler = reinterpret_cast<InputHandler*>(glfwGetWindowUserPointer(window));
+        auto* handler = (InputHandler*)(glfwGetWindowUserPointer(window));
         if (handler && (action == GLFW_PRESS || action == GLFW_RELEASE)) {
             handler->attemptTriggerActionForKey(key, action == GLFW_PRESS);
         }
@@ -85,19 +89,38 @@ private:
         }
     }
 
-    void attemptTriggerActionForKey(int key, bool isPressed);
+    static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+        auto* handler = (InputHandler*)(glfwGetWindowUserPointer(window));
+        if (handler && (action == GLFW_PRESS || action == GLFW_RELEASE)) {
+            handler->attemptTriggerActionForMouseButton(button, action == GLFW_PRESS);
+        }
+    }
 
+    static void glfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+        auto* handler = (InputHandler*)(glfwGetWindowUserPointer(window));
+        if (handler) {
+            handler->updateMousePosition(xpos, ypos);
+        }
+    }
+
+    void attemptTriggerActionForKey(int key, bool isPressed);
+    void attemptTriggerActionForMouseButton(int button, bool isPressed);
     void attemptTriggerActionForGamepadButton(int button, bool isPressed);
+    void updateMousePosition(double xpos, double ypos);
     
     void updateActionState(Action action, bool isPressed);
     
-private:
     //TODO?
     bool hasJoystick() {return joystickId != -1;}
+public:
+    dvec2 mousePosf;
+    ivec2 mousePosi;
+private:
     int joystickId = -1;
     GLFWgamepadstate gState;
     //finite amount of keys / actions. Might change if action become dynamic
     FixedMap<GLFW_KEY_LAST+1, Action> keyActionMap;
+    FixedMap<GLFW_MOUSE_BUTTON_LAST+1, Action> mouseActionMap;
     FixedMap<GLFW_GAMEPAD_BUTTON_LAST+1, Action> buttonActionMap;
     FixedMap<Action::LAST_ACTION, std::function<void(Action)>> actionCallbackMap;
     FixedMap<Action::LAST_ACTION, ActionType> actionTypeMap;

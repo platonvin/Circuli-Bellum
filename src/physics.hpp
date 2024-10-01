@@ -42,13 +42,13 @@ using glm::vec2;
 // Thin wrapper around box2d
 class PhysicalWorld {
 public:
-    void create(b2Vec2 _gravity = {0, -9.81}) {
+    void setup(b2Vec2 _gravity = {0, -17.}) {
         gravity = _gravity;
         b2WorldDef worldDef = b2DefaultWorldDef();
         world_id = b2CreateWorld(&worldDef);
         b2World_SetGravity(world_id, gravity);
     }
-    void destroy() {
+    void cleanup() {
         b2DestroyWorld(world_id);
     }
 
@@ -107,14 +107,17 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
     apl(props->body_type)
     bodyDef.type = props->body_type;
     bodyDef.position = glm2b(state->pos);
+    bodyDef.linearVelocity = glm2b(state->vel);
     bodyDef.isAwake = true;
     bodyDef.isEnabled = true;
     bodyDef.enableSleep = false;
     bodyDef.sleepThreshold = 0;
 
-    bind->body = b2CreateBody(world_id, &bodyDef);
     assert(bind);
-    assert(b2Body_IsValid(bind->body));
+    pl(bind->body.index1)
+    pl(bind->shape.index1)
+    assert(b2World_IsValid(world_id));
+    bind->body = b2CreateBody(world_id, &bodyDef);
     // if(sdef == nullptr){
     // }
     b2ShapeDef shapeDef;
@@ -127,9 +130,14 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
     shapeDef.density = 1;
 
     bind->shape = Fun(bind->body, &shapeDef, shape);
+    assert(b2Shape_IsValid(bind->shape));
+    if(!b2Body_IsValid(bind->body)){
+
+    }
+    assert(b2Body_IsValid(bind->body));
     pl(bind->body.index1)
     pl(bind->shape.index1)
-    assert(b2Shape_IsValid(bind->shape));
+    // assert(b2Shape_IsValid(bind->shape));
     assert(user_data);
     b2Body_SetUserData(bind->body, user_data);
     b2Shape_SetUserData(bind->shape, user_data);

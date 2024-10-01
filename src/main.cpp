@@ -12,12 +12,14 @@ using namespace glm;
 int main() {
 l()
     LogicalScene logic = {};
-    logic.create(0);
+    logic.setup(1);
 
 l()
     logic.addNewPlayer();
 l()
-    logic.addScenery(Scenery(Square, {.SQUARE_half_width=1, .SQUARE_half_height=3}, vec2(0), false));
+    logic.addScenery(Scenery(Square, {.SQUARE_half_width=1, .SQUARE_half_height=3}, vec2(-3,0), false));
+
+    logic.addScenery(Scenery(Square, {.SQUARE_half_width=9, .SQUARE_half_height=1}, vec2(2,-1), false));
 l()
     // Main loop
     double previous = 0;
@@ -25,7 +27,7 @@ l()
     while ((!glfwWindowShouldClose(logic.view.render.window.pointer)) && (!glfwGetKey(logic.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
         current = glfwGetTime();
-        if((current - previous) > 0.01){
+        if((current - previous) > 0.005){
 
             logic.tick(current - previous);
             
@@ -34,6 +36,6 @@ l()
     }
 
     // Clean up
-    logic.destroy();
+    logic.cleanup();
     return 0;
 }

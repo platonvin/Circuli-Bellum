@@ -7,10 +7,11 @@ InputHandler::InputHandler() {
     keyActionMap[GLFW_KEY_A] = Action::MoveLeft;
     keyActionMap[GLFW_KEY_D] = Action::MoveRight;
     keyActionMap[GLFW_KEY_SPACE] = Action::Jump;
-    keyActionMap[GLFW_MOUSE_BUTTON_LEFT] = Action::Shoot;
-    keyActionMap[GLFW_MOUSE_BUTTON_RIGHT] = Action::Block;
     keyActionMap[GLFW_KEY_ESCAPE] = Action::Menu;
     keyActionMap[GLFW_KEY_ENTER] = Action::Confirm;
+
+    mouseActionMap[GLFW_MOUSE_BUTTON_LEFT] = Action::Shoot;
+    mouseActionMap[GLFW_MOUSE_BUTTON_RIGHT] = Action::Block;
 
     buttonActionMap[GLFW_GAMEPAD_BUTTON_DPAD_UP] = Action::MoveUp;
     buttonActionMap[GLFW_GAMEPAD_BUTTON_DPAD_DOWN] = Action::MoveDown;
@@ -30,12 +31,24 @@ InputHandler::InputHandler() {
     actionTypeMap[Action::Menu] = ActionType::OneShot;
     actionTypeMap[Action::Confirm] = ActionType::OneShot;
     actionTypeMap[Action::Block] = ActionType::OneShot;
+    actionTypeMap[Action::Shoot] = ActionType::OneShot;
 }
 
 void InputHandler::rebindKey(Action action, int newKey) {
     keyActionMap[newKey] = action;
     apl((int)action);
     apl((int)newKey);
+}
+
+void InputHandler::rebindMouseButton(Action action, int newKey) {
+    mouseActionMap[newKey] = action;
+    apl((int)action);
+    apl((int)newKey);
+}
+
+void InputHandler::updateMousePosition(double xpos, double ypos) {
+    mousePosf = dvec2(double(xpos), double(ypos));
+    mousePosi = ivec2(int(xpos), int(ypos));
 }
 
 void InputHandler::rebindGamepadButton(Action action, int newButton) {
@@ -56,6 +69,13 @@ void InputHandler::attemptTriggerActionForKey(int key, bool isPressed) {
     }
 }
 
+void InputHandler::attemptTriggerActionForMouseButton(int button, bool isPressed) {
+    if (mouseActionMap.contains(button)) {
+        Action action = mouseActionMap[button];
+        updateActionState(action, isPressed);
+    }
+}
+
 void InputHandler::attemptTriggerActionForGamepadButton(int button, bool isPressed) {
     if (buttonActionMap.contains(button)) {
         Action action = buttonActionMap[button];
@@ -68,7 +88,6 @@ void InputHandler::attemptTriggerActionForGamepadButton(int button, bool isPress
 //required for gamepads. Keyboards are handled via callback
 void InputHandler::pollUpdates() {
     for(int act=0; act<to_underlying(Action::LAST_ACTION); act++){
-        
         updateActionState((Action)act, currentActionStates[act]);
     }
     if (glfwGetGamepadState(GLFW_JOYSTICK_1, &gState)) {
@@ -84,6 +103,8 @@ void InputHandler::pollUpdates() {
 void InputHandler::setup(GLFWwindow* window) {
     glfwSetWindowUserPointer(window, this);
     glfwSetKeyCallback(window, glfwKeyCallback);
+    glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
+    glfwSetCursorPosCallback(window, glfwCursorPosCallback);
     glfwSetJoystickCallback(glfwJoystickConnectCallback);
     //TODO?
     joystickId = glfwJoystickPresent(GLFW_JOYSTICK_1) ? -1 : GLFW_JOYSTICK_1;

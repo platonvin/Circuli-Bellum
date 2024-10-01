@@ -3,7 +3,7 @@
 
 #define println printf("%s:%d: Fun: %s\n", __FILE__, __LINE__, __FUNCTION__);
 
-void VisualView::init() {
+void VisualView::setup() {
     Settings settings = {};
         settings.vsync = false; //every time deciding to which image to render, wait until monitor draws current. Icreases perfomance, but limits fps
         settings.fullscreen = false;

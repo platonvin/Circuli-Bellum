@@ -4,88 +4,54 @@
 #define println printf("%s:%d: Fun: %s\n", __FILE__, __LINE__, __FUNCTION__);
 
 void LogicalScene::addScenery(Scenery scenery){
-    ListElem<Scenery>* new_scenery = sceneries.appendBack(scenery);
-    addSceneryToWorld(new_scenery->obj(), {});
+    ListElem<Scenery>* new_e = sceneries.appendBack(scenery);
+    new_e->obj()->addToWorld(&world);
 }
-void LogicalScene::removeScenery(ListElem<Scenery>* scenery){
-    sceneries.removeElem(scenery);
-    b2DestroyBody(scenery->obj()->actor.bindings.body); //TODO
+void LogicalScene::removeScenery(ListElem<Scenery>* se){
+    b2DestroyBody(se->obj()->actor.bindings.body); //TODO
+    sceneries.removeElem(se);
 }
-void LogicalScene::removeAllScenery(){
-    for(auto& s : sceneries){
-        b2DestroyBody(s.actor.bindings.body);
+void LogicalScene::removeAllScenery() {
+    for (let scenery : sceneries) {
+        b2DestroyBody(scenery.actor.bindings.body);
     }
-    sceneries.removeAll();
+    projectiles.removeAll();
 }
-void LogicalScene::addProjectile(Projectile projectile){
-    ListElem<Projectile>* new_projectile = projectiles.appendBack(projectile);
-    addProjectileToWorld(new_projectile->obj());
+
+void LogicalScene::addProjectile(Projectile projectile) {
+    ListElem<Projectile>* new_e = projectiles.appendBack(projectile);
+    // pl(projectile.actor.state.pos.x)
+    // pl(projectile.actor.state.pos.y)
+    // pl(projectile.actor.state.vel.x)
+    // pl(projectile.actor.state.vel.y)
+    new_e->obj()->addToWorld(&world);
 }
-void LogicalScene::removeProjectile(ListElem<Projectile>* projectile){
-    projectiles.removeElem(projectile);
-    b2DestroyBody(projectile->obj()->actor.bindings.body); //TODO
+
+void LogicalScene::removeProjectile(ListElem<Projectile>* pe) {
+    b2DestroyBody(pe->obj()->actor.bindings.body);
+    projectiles.removeElem(pe);
 }
-void LogicalScene::removeAllProjectiles(){
-    for(auto& s : projectiles){
-        b2DestroyBody(s.actor.bindings.body);
+
+void LogicalScene::removeAllProjectiles() {
+    for (let projectile : projectiles) {
+        b2DestroyBody(projectile.actor.bindings.body);
     }
     projectiles.removeAll();
 }
 
 // when world is cleared and new one created
 // players travel between worlds, everything else doesnt
-void LogicalScene::addPlayerToWorld(Player* player) {
-    assert(player);
-    b2Circle player_circle = {};
-        player_circle.radius = player->props.radius;
-    // b2BodyDef bodyDef = b2DefaultBodyDef();
-    //     bodyDef.type = player->actor.properties.body_type;
-    //     bodyDef.position = glm2b(player->actor.state.pos);
-    // b2ShapeDef shapeDef = b2DefaultShapeDef();
-    //     shapeDef.enableHitEvents = true;
 
-    world.addActor<b2Circle, b2CreateCircleShape>(&player->actor.bindings, &player->actor.state, &player->actor.properties, player, &player_circle);
-}
-void LogicalScene::addSceneryToWorld(Scenery* scenery, const std::vector<b2Vec2>& vertices) {
-    //for now, just box ¯\_(ツ)_/¯
-l()
-    //TODO:
-    b2Polygon poly = b2MakeBox(scenery->actor.shapeProps.SQUARE_half_width, scenery->actor.shapeProps.SQUARE_half_height);
-l()
-    world.addActor<b2Polygon, b2CreatePolygonShape>(&scenery->actor.bindings, &scenery->actor.state, &scenery->actor.properties, scenery, &poly);
-l()
-}
-void LogicalScene::addProjectileToWorld(Projectile* projectile) {
-    //TODO capsule
-    b2Circle bullet_circle = {};
-        bullet_circle.radius = projectile->props.radius;
-    world.addActor<b2Circle, b2CreateCircleShape>(&projectile->actor.bindings, &projectile->actor.state, &projectile->actor.properties, projectile, &bullet_circle);
-}
-
-void LogicalScene::addNewPlayer(/*some visual props*/){
+void LogicalScene::addNewPlayer(/*some visual props*/) {
     Player player = Player(1, 4.2);
     player.actor.state.pos.y = 8.0;
     player.props.radius = 1.0;
-        apl((int)player.actor.state.pos.x)
-        apl((int)player.actor.state.pos.y)
-        // apl((int)player.actor.properties.color.r)
-        // apl((int)player.actor.properties.color.g)
-        // apl((int)player.actor.properties.color.b)
-    // pl((void*)(players.end()))
-    // pl((void*)(players.begin()))
-    // pl(players.end() - players.begin())
-    ListElem<Player>* new_player = players.appendBack(player);
-    // pl(new_player->obj())
-    addPlayerToWorld(new_player->obj());
-    // pl((void*)(players.end()))
-    // pl((void*)(players.begin()))
-    // pl(players.end() - players.begin())
-    players.printList();
-    // abort();
+    ListElem<Player>* new_e = players.appendBack(player);
+    new_e->obj()->addToWorld(&world);
 }
-void LogicalScene::removeAllPlayers(){
-    for(auto& p : players){
-        b2DestroyBody(p.actor.bindings.body);
+void LogicalScene::removeAllPlayers() {
+    for (let player : players) {
+        b2DestroyBody(player.actor.bindings.body);
     }
     players.removeAll();
 }
@@ -94,35 +60,51 @@ void LogicalScene::clearWorld(void) {
     //TODO destroy ents?
     removeAllScenery();
     removeAllProjectiles();
-    world.destroy(); 
-    world.create();
+    world.cleanup(); 
+    world.setup();
 }
 
 void LogicalScene::setupActionCallbacks() {
     // input.rebindKey(Action::Jump, GLFW_KEY_SPACE);
     input.setActionCallback(Action::Jump, 
         [this](Action action) -> void {
-            Player* p = players._start->obj();
-            // if(p->state.jumps_left > 0){
-            if(p->state.jumps_left > 0){
-                world.applyImpulse(p->actor.bindings.body, 
+            // Player* p = players._start->obj();
+            if(controlled_player->state.jumps_left > 0){
+                // npl("JUMP");
+                world.applyImpulse(controlled_player->actor.bindings.body, 
                     b2Vec2(0,20.0));
-                auto t = b2Body_GetTransform(p->actor.bindings.body);
-                // t.p.y += 1.1;
-                b2Body_SetTransform(p->actor.bindings.body, t.p, t.q);
-                npl("JUMP");
-                // b2set
-                // p->state.jumps_left--;
-                p->state.jumps_left--;
+                // auto t = b2Body_GetTransform(controlled_player->actor.bindings.body);
+                // b2Body_SetTransform(controlled_player->actor.bindings.body, t.p, t.q);
+                controlled_player->state.jumps_left--;
 
                 //so not updated from previous
-                p->state.refill_jumps_next_frame = false;
+                controlled_player->state.refill_jumps_next_frame = false;
             }
+        }
+    );
+    input.setActionCallback(Action::Shoot, 
+        [this](Action action) -> void {
+            pl("shoot")
+            // Player* p = players._start->obj();
+            auto bullet = Projectile(10, .1);
+            bullet.actor.state.pos = 
+                controlled_player->actor.state.pos +
+                controlled_player->state.aim_direction * (bullet.props.radius + controlled_player->props.radius + 0.1f);
+            // apl(controlled_player->state.aim_direction.x);
+            // apl(controlled_player->state.aim_direction.y);
+            bullet.actor.state.vel = 
+                controlled_player->state.aim_direction * 
+                float(controlled_player->props.bullet_speed)+
+                controlled_player->actor.state.vel;
+            bullet.state.damage = controlled_player->state.damage;
+            // l()
+            addProjectile(bullet);
+            pl("end shoot")
         }
     );
     input.setActionCallback(Action::MoveLeft, 
         [this](Action action) -> void {
-            world.applyForce(players._start->obj()->actor.bindings.body, 
+            world.applyForce(controlled_player->actor.bindings.body, 
                 b2Vec2(-20.f,0.1));
             
         // al()
@@ -130,44 +112,78 @@ void LogicalScene::setupActionCallbacks() {
     );
     input.setActionCallback(Action::MoveRight, 
         [this](Action action) -> void {
-            world.applyForce(players._start->obj()->actor.bindings.body, 
+            world.applyForce(controlled_player->actor.bindings.body, 
                 b2Vec2(+20.f,0.1));
         // al()
         }
     );
 }
-void LogicalScene::create(int player_count) {
-    world.create();
-    view.init(); 
+void LogicalScene::setup(int player_count) {
+    world.setup();
+    view.setup(); 
+
 
     for(int i=0; i<player_count; i++){
         addNewPlayer();
     }
+
+    //TODO
+    controlled_player = players._start->obj();
 
     input.setup(view.render.window.pointer);
 
     setupActionCallbacks();
 }
 
-void LogicalScene::destroy(void) {
+void LogicalScene::cleanup(void) {
     //TODO check b2
     removeAllPlayers();
     removeAllScenery();
     removeAllProjectiles();
-    world.destroy();
+    world.cleanup();
     view.cleanup();
     input.cleanup();
 }
 
 void LogicalScene::processBeginEvents(b2ContactEvents contacts){ 
-    auto beginProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
-        pl(typeA);
-        pl(typeB);
+    auto beginProcessor = [this](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
         switch (typeA | typeB) {
             case (ActorType::Player | ActorType::Scenery): {
-                Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
-                player->state.touching_grass = true;
+                al()
+                Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
+                player->state.touching_grass_counter++;
                 // player->state.last_jmp_refill = glfwGetTime(); //TODO?
+                al()
+                break;
+            }
+            case (ActorType::Projectile | ActorType::Scenery): {
+                al()
+                Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
+                Scenery* scenery = (typeA == ActorType::Scenery) ? (Scenery*)(udataA) : (Scenery*)(udataB);
+                //possibly damage scenery, bounce/kill bullet
+                bool survived = projectile->processSceneryHit(&scenery->state);
+                if(!survived){
+                    // body_garbage.push_back(projectile->actor.bindings.body);
+                    // projectiles.softRemoveElem((ListElem<Projectile>*)projectile);
+                }
+                al()
+                break;
+            }
+            case (ActorType::Player | ActorType::Projectile): {
+                al()
+                Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
+                Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
+
+                    bool survived = projectile->processPlayerHit(&player->state);
+                    if(!survived){
+                        body_garbage.push_back(projectile->actor.bindings.body);
+                        projectiles.softRemoveElem((ListElem<Projectile>*)projectile);
+                    }
+                if(player != controlled_player){
+                    player->processBulletHit(&projectile->state);
+                }
+                    
+                al()
                 break;
             }
             default:
@@ -176,40 +192,35 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
         }
     };
 
-    for (int i = 0; i < contacts.beginCount; ++i) {
-        pl("begin")
+    for (int i = 0; i < contacts.beginCount; i++) {
+        // pl("begin")
         processCollisionEvent(contacts.beginEvents[i], beginProcessor);
     }
 }
 void LogicalScene::processEndEvents(b2ContactEvents contacts){ 
-    auto endProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
-        pl(typeA);
-        pl(typeB);
+    auto endProcessor = [this](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
         switch (typeA | typeB) {
             case (ActorType::Player | ActorType::Scenery): {
-                Player* player = (typeA == ActorType::Player) ? (Player*)udataA : (Player*)udataB;
-                player->state.touching_grass = false;
+                Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
+                player->state.touching_grass_counter--;
                 //if end event, we are in fact not touching grass and should not refill
                 player->state.refill_jumps_next_frame = false;
                 break;
             }
+            
             default:
                 std::cerr << "wrong ActorType combination in endEvent\n";
                 break;
         }
     };
 
-    for (int i = 0; i < contacts.endCount; ++i) {
-        pl("end")
+    for (int i = 0; i < contacts.endCount; i++) {
         // l()
         processCollisionEvent(contacts.endEvents[i], endProcessor);
     }
 }
 void LogicalScene::processHitEvents(b2ContactEvents contacts){ 
     auto contactProcessor = [](ActorType typeA, void* udataA, ActorType typeB, void* udataB) {
-        pl(typeA);
-        pl(typeB);
-
         switch (typeA | typeB) {
             default:
                 std::cerr << "wrong ActorType combination in hitEvent\n";
@@ -217,7 +228,7 @@ void LogicalScene::processHitEvents(b2ContactEvents contacts){
         }
     };
 
-    for (int i = 0; i < contacts.hitCount; ++i) {
+    for (int i = 0; i < contacts.hitCount; i++) {
         // l()
         processCollisionEvent(contacts.hitEvents[i], contactProcessor);
     }
@@ -227,117 +238,77 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves){
     for(int i=0; i<moves.moveCount; i++){
         auto& move = moves.moveEvents[i];
         // Actually, it is pointer to Player/Scenery/Projectile, but Actor is thir first member
-        Actor* actor = (Actor*)move.userData; 
+        Actor* actor = (Actor*)(move.userData); 
         assert(actor);
         actor->state.pos = b2glm(move.transform.p);
         actor->state.rot = b2glm(move.transform.q);
 
-        // pl(actor->actorType);
-        pl(actor->actorType);
-        //updating player TODO move away
+        actor->state.vel = world.getVelocity(actor->bindings.body);
+
         if(actor->actorType == ActorType::Player){
             Player* player = (Player*)actor; 
 
-            vec2 current_vel = world.getVelocity(actor->bindings.body);
-            vec2 desired_vel = vec2(1);
-            float current_len = glm::length(current_vel);
-            float desired_len = glm::length(desired_vel);
-            if(current_len > desired_len){
-                vec2 force_direction = -glm::normalize(current_vel);
-                float ldiff = (current_len - desired_len);
-                world.applyForce(players._start->obj()->actor.bindings.body, 
-                    glm2b(force_direction*ldiff*2.0f));
-            }
-            pl(player->state.touching_grass);
-            // pl(player->state.jumps_left);
-            pl("after");
+            vec2 mouse_wpos = (vec2((input.mousePosf)/dvec2(1920,1080))*2.f - 1.f) * view.camera.cameraScale;
+            player->update(&world, (mouse_wpos));
 
-            //like its next frame. TODO: box2d end event on the same tick?
-            if(player->state.refill_jumps_next_frame){
-                player->state.jumps_left = player->props.max_jumps;
-                player->state.refill_jumps_next_frame = false;
-            }
-            if(player->state.touching_grass){
-                player->state.refill_jumps_next_frame = true;
 
-            }
-            pl(player->state.touching_grass);
-            // pl(player->state.jumps_left);
-            pl(player->state.refill_jumps_next_frame);
         }
-        /*
-        what i want is:
-        jump refilled whhen:
-            in contact with surface and not jumped away from it
-            so, basically
-        */
     }
 }
-/*
-input: jump
-no jumps
-
-on grass ? +1 : _
-
-end event:
-    
-*/
 
 void LogicalScene::tick(float dTime) {
-    //first to be more responsive
-    if(glfwGetKey(view.render.window.pointer, GLFW_KEY_ENTER) == GLFW_PRESS){
-        pl("tick start");
-        input.pollUpdates();
-        
-        world.step(dTime);
-        b2BodyEvents bodyEvents = world.GetBodyEvents();
-        b2ContactEvents contacts = world.GetContactEvents();
-        // pl(players._start->obj()->state.has_jump);
-        pl(players._start->obj()->state.touching_grass);
-        processBeginEvents(contacts);
-        pl(players._start->obj()->state.touching_grass);
-        processEndEvents(contacts);
-        processHitEvents(contacts);
-        pl(players._start->obj()->state.touching_grass);
-        processMoveEvents(bodyEvents);
-        pl(players._start->obj()->state.refill_jumps_next_frame);
+    input.pollUpdates();
+    
+    world.step(dTime);
+    b2BodyEvents bodyEvents = world.GetBodyEvents();
+    b2ContactEvents contacts = world.GetContactEvents();
 
+// al()
+    processBeginEvents(contacts);
+// al()
+    processEndEvents(contacts);
+// al()
+    processHitEvents(contacts);
+// al()
+    processMoveEvents(bodyEvents);
+// al()
 
-        // -y to invert vertically
-        view.camera.cameraScale = {1920/float(1080)*10.0, -1*10.0};
+// al()
+    // pl(body_garbage.size());
+    for(auto& bg : body_garbage){
+        b2DestroyBody(bg);
+    } body_garbage.clear();
+    projectiles.collectGarbage();
+// al()
+    players.collectGarbage();
+// al()
+    sceneries.collectGarbage();
+// al()
+    // -y to invert vertically
+    view.camera.cameraScale = {1920/float(1080)*10.0, -1*10.0};
 
-        view.start_frame();
-            view.start_main_pass();
+    view.start_frame();
+        view.start_main_pass();
 
-    // l()
-        // Draw everything. Basically reorders memory in specific buffers for GPU convenience
-        for(let p : players){
-            view.draw_dynamic_shape(p.constructShape(), SolidColor);
-        }
-        for(let s : sceneries){
-            view.draw_dynamic_shape(s.constructShape(), SolidColor);
-        }
-        for(let p : projectiles){
-            view.draw_dynamic_shape(p.constructShape(), SolidColor);
-        }
-    // l()
-
-        view.end_main_pass();
-        
-        // view.bloom_pass();
-    // println
-        view.end_frame();
-    // println
-        pl("tick end\n");
-
-        /*
-        in contact
-        if has jump:    
-            jump
-            now has NO jump
-        still in contact
-        */
+    // Draw everything. Basically reorders memory in specific buffers for GPU convenience
+    //TODO static
+// al()
+    for(let p : players){
+        view.draw_dynamic_shape(p.constructShape(), SolidColor);
     }
+    for(let s : sceneries){
+        view.draw_dynamic_shape(s.constructShape(), SolidColor);
+    }
+    for(let p : projectiles){
+        view.draw_dynamic_shape(p.constructShape(), SolidColor);
+    }
+// al()
+
+    view.end_main_pass();
+    
+    // view.bloom_pass();
+    view.end_frame();
+
 }
 
 Shape Actor::constructActorShape(){
@@ -345,29 +316,5 @@ Shape Actor::constructActorShape(){
         shape.coloring_info = properties.color;
         shape.pos = state.pos;
         shape.props = shapeProps;
-    return shape;
-}
-Shape Player::constructShape(){
-    Shape shape = actor.constructActorShape();
-        shape.shapeType = Circle;
-        //overwrites
-        shape.props.CIRCLE_radius = props.radius;
-    // pl(shape.pos.x);
-    // pl(shape.pos.y);
-    // pl(shape.props.CIRCLE_radius);
-    return shape;
-}
-Shape Scenery::constructShape(){
-    Shape shape = actor.constructActorShape();
-        shape.shapeType = Square;
-        shape.shapeType = convertShapeType(actor.properties.shape_type);
-        //TODO?
-    return shape;
-}
-Shape Projectile::constructShape(){
-    Shape shape = actor.constructActorShape();
-        shape.shapeType = Circle;
-        //overwrites
-        shape.props.CIRCLE_radius = props.radius;
     return shape;
 }

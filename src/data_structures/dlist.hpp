@@ -1,5 +1,8 @@
 #pragma once
+#include "al.hpp"
+#include "macros.hpp"
 #include <strstream>
+#include <unordered_set>
 #ifndef DLIST_HPP
 #define DLIST_HPP
 
@@ -10,9 +13,10 @@
 
 template <class StoredClass>
 struct alignas(8) ListElem {
+    //first for rtti
+    StoredClass storage;
     ListElem* next = nullptr;
     ListElem* prev = nullptr;
-    StoredClass storage;
 
     template <typename... Args>
     ListElem(Args&&... args) : storage(std::forward<Args>(args)...) {}
@@ -22,14 +26,15 @@ struct alignas(8) ListElem {
     StoredClass* obj() {return &storage;}
 };
 
-template <class StoredClass>
+template <class Type>
 class alignas(8) List {
 public:
-    using ListElemType = ListElem<StoredClass>;
+    using ListElemType = ListElem<Type>;
 
     ListElemType* _start = nullptr;
     ListElemType* _end = nullptr;
 
+    std::unordered_set<ListElem<Type>*> garbage; 
     // List itself isn't malloced
     ~List() {
         removeAll();
@@ -46,6 +51,15 @@ public:
     }
 
     void removeElem(ListElemType* elem_ptr) {
+        assert(elem_ptr);
+        bool found = false;
+        ListElemType* current = _start;
+        while (current) {
+            ListElemType* nextElem = current->next;
+            if(current == elem_ptr) found=true;
+            current = nextElem;
+        } assert (found);
+        
         // assuming elem_ptr is perfectly valid
         if (elem_ptr->prev) {
             elem_ptr->prev->next = elem_ptr->next;
@@ -62,7 +76,32 @@ public:
         delete elem_ptr;
     }
 
-    ListElemType* insertAfter(ListElemType* elem_ptr, const StoredClass& class_obj) {
+    //GC
+    void softRemoveElem(ListElemType* elem_ptr) {
+        garbage.insert(elem_ptr);
+    }
+
+    void collectGarbage() {
+// al()
+    //     ListElemType* current = _start;
+    // while (current) {
+    //     ListElemType* nextElem = current->next;
+    //     pl(current);
+    //     current = nextElem;
+    // }
+
+        for(auto g : garbage){
+// al()
+            // pl(g);
+            removeElem(g);
+        }
+// al()
+        garbage.clear();
+// al()
+    }
+
+
+    ListElemType* insertAfter(ListElemType* elem_ptr, const Type& class_obj) {
         ListElemType* newElem = new ListElemType(class_obj);
         newElem->next = elem_ptr->next;
         newElem->prev = elem_ptr;
@@ -77,7 +116,7 @@ public:
         return newElem;
     }
 
-    ListElemType* insertBefore(ListElemType* elem_ptr, const StoredClass& class_obj) {
+    ListElemType* insertBefore(ListElemType* elem_ptr, const Type& class_obj) {
         ListElemType* newElem = new ListElemType(class_obj);
         newElem->next = elem_ptr;
         newElem->prev = elem_ptr->prev;
@@ -93,31 +132,23 @@ public:
     }
 
     //TODO?
-    ListElemType* insertSomewhere(const StoredClass& class_obj) {
+    ListElemType* insertSomewhere(const Type& class_obj) {
         return appendBack(class_obj);
     }
 
-    ListElemType* appendBack(const StoredClass& class_obj) {
+    ListElemType* appendBack(const Type& class_obj) {
         ListElemType* newElem = new ListElemType(class_obj);
         if (!_end) {
-            pl(_end);
-            pl(_start);
             _start = _end = newElem;
-            pl(_end);
-            pl(_start);
         } else {
-            pl(_end);
-            pl(_start);
             _end->next = newElem;
             newElem->prev = _end;
             _end = newElem;
-            pl(_end);
-            pl(_start);
         }
         return newElem;
     }
 
-    ListElemType* appendFront(const StoredClass& class_obj) {
+    ListElemType* appendFront(const Type& class_obj) {
         ListElemType* newElem = new ListElemType(class_obj);
         if (!_start) {
             _start = _end = newElem;
@@ -144,7 +175,7 @@ public:
     public:
         Iterator(ListElemType* ptr) : current(ptr) {}
 
-        StoredClass& operator*() {
+        Type& operator*() {
             return current->storage;
         }
 
@@ -155,6 +186,9 @@ public:
 
         bool operator!=(const Iterator& other) const {
             return current != other.current;
+        }
+        bool operator==(const Iterator& other) const {
+            return current == other.current;
         }
 
         unsigned long long operator-(const Iterator& other) const {
@@ -173,7 +207,7 @@ public:
     public:
         ReverseIterator(ListElemType* ptr) : current(ptr) {}
 
-        StoredClass& operator*() {
+        Type& operator*() {
             return current->storage;
         }
 
