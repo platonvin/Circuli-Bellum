@@ -1,4 +1,5 @@
 #pragma once
+#include "visual.hpp"
 #ifndef __PHYSICS_HPP__
 #define __PHYSICS_HPP__
 
@@ -40,6 +41,7 @@ struct PhysicalBindings;
 using glm::vec2;
 
 // Thin wrapper around box2d
+// basically does nothing. 
 class PhysicalWorld {
 public:
     void setup(b2Vec2 _gravity = {0, -17.}) {
@@ -80,7 +82,8 @@ private:
 
 struct PhysicalState {
     glm::vec2 pos = glm::vec2(0);
-    glm::vec2 rot = glm::vec2(0);
+    glm::vec2 old_pos = glm::vec2(0);
+    glm::vec2 rot = glm::vec2(1,0);
     glm::vec2 vel = glm::vec2(0);
 };
 struct PhysicalProperties {
@@ -88,7 +91,7 @@ struct PhysicalProperties {
     float friction = 0.3;
     b2BodyType body_type = b2_staticBody;
     // not aligned with view ShapeType. They are just different
-    b2ShapeType shape_type = b2_circleShape;
+    ShapeType shape_type = Circle;
 };
 struct PhysicalBindings {
     b2BodyId body = {};
@@ -112,10 +115,11 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
     bodyDef.isEnabled = true;
     bodyDef.enableSleep = false;
     bodyDef.sleepThreshold = 0;
+    bodyDef.automaticMass = true;
 
     assert(bind);
-    pl(bind->body.index1)
-    pl(bind->shape.index1)
+    // pl(bind->body.index1)
+    // pl(bind->shape.index1)
     assert(b2World_IsValid(world_id));
     bind->body = b2CreateBody(world_id, &bodyDef);
     // if(sdef == nullptr){

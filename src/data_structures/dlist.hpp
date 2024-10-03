@@ -1,10 +1,7 @@
 #pragma once
-#include "al.hpp"
-#include "macros.hpp"
-#include <strstream>
-#include <unordered_set>
 #ifndef DLIST_HPP
 #define DLIST_HPP
+#include <unordered_set>
 
 #include <cassert>
 #include <iostream>

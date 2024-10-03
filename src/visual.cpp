@@ -101,6 +101,9 @@ void VisualView::createPipes(void) {
     createFillerPipes({
         {SolidColor, "shaders/compiled/solid.frag.spv"},
         {RandomColor, "shaders/compiled/random.frag.spv"}, 
+        {LEDstyle, "shaders/compiled/led.frag.spv"}, 
+        {FBMstyle, "shaders/compiled/fbm.frag.spv"}, 
+        {GRIDstyle, "shaders/compiled/grid.frag.spv"}, 
     });
 
     // render.pipeBuilder.setStages({
@@ -187,7 +190,7 @@ void VisualView::createShapeBuffers(){
 }
 void VisualView::createUniformBuffer(){
     VkDeviceSize 
-        bufferSize = sizeof(Camera);
+        bufferSize = 28;
     render.createBufferStorages(&uniform, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
     render.mapBufferStorages(&uniform);
 }
@@ -230,8 +233,10 @@ void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> 
                 {VK_FORMAT_R8G8B8_UINT, offsetof (Shape, coloring_info)},
                 {VK_FORMAT_R8_UINT, offsetof (Shape, shapeType)},
                 {VK_FORMAT_R32G32_SFLOAT, offsetof (Shape, pos)},
+                {VK_FORMAT_R32G32_SFLOAT, offsetof (Shape, rot)},
                 {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_1)},
                 {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_2)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_3)},
             }).setStride(sizeof(Shape)).setPushConstantSize(0)
             .setExtent(render.swapChainExtent).setBlends({BLEND_MIX})
             .setCulling(VK_CULL_MODE_NONE).setInputRate(VK_VERTEX_INPUT_RATE_INSTANCE).setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
@@ -239,8 +244,10 @@ void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> 
     }
 }
 void VisualView::updateUniformBuffers(){
-    // struct {vec2 pos, size;} unicopy = {camera.cameraPos, camera.cameraScale};
-    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(Camera), &camera);    
+    struct {vec2 pos, size; ivec2 res; float time;} unicopy = {
+        camera.cameraPos, camera.cameraScale,
+        ivec2(render.swapChainExtent.width, render.swapChainExtent.height), float(glfwGetTime())};
+    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(unicopy), &unicopy);    
     render.cmdPipelineBarrier (graphicsCommandBuffers.current(),
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,

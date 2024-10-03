@@ -51,6 +51,7 @@ enum class Action : int {
     Block,
     Menu,
     Confirm,
+    DrawRNDcard, //TEMP TODO
     LAST_ACTION,
 };
 

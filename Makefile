@@ -15,8 +15,8 @@ ifeq ($(OS),Windows_NT)
 else
 	REQUIRED_LIBS += -lpthread -ldl
 endif
-	
-always_enabled_flags = -fno-exceptions -std=c++20 -flto
+
+always_enabled_flags = -fno-exceptions -std=c++20
 debug_flags   = -O0 -g 
 # TODO -fsanitize=undefined
 release_flags = -Os -mmmx -msse4 -mpclmul -s -flto
@@ -71,15 +71,20 @@ DEPS = $(deb_objs:.o=.d)
 
 SHADER_SRC_DIR = shaders
 SHADER_OUT_DIR = shaders/compiled
+SHADERS_EXTRA_DEPEND = \
+	shaders/common/header.glsl\
+	shaders/common/colors.glsl\
+	shaders/noise/fbm.glsl\
+	shaders/noise/perlin.glsl\
 
 _SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.vert)
 _SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.frag)
 _TARGETS = $(patsubst $(SHADER_SRC_DIR)/%, $(SHADER_OUT_DIR)/%.spv, $(_SHADERS))
 
-$(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/%
+$(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/% $(SHADERS_EXTRA_DEPEND)
 	$(GLSLC) -o $@ $< $(SHADER_FLAGS)
 
-shaders: vcpkg_installed_eval $(_TARGETS)
+shaders: vcpkg_installed_eval $(SHADERS_EXTRA_DEPEND) $(_TARGETS)
 
 
 debug: init vcpkg_installed_eval shaders $(deb_objs) build_deb 

@@ -6,14 +6,17 @@
 layout(location = 0) in uvec3 coloring_info;
 layout(location = 1) in uint shape_type;
 layout(location = 2) in vec2 global_pos;
-layout(location = 3) in float value_1; // used to make shape size
-layout(location = 4) in float value_2; // used to make shape size
+layout(location = 3) in vec2 rotation;
+layout(location = 4) in float value_1; // used to make shape size
+layout(location = 5) in float value_2; // used to make shape size
+layout(location = 6) in float value_3; // used to make shape size
 
 layout(location = 0) flat out uvec3 out_coloring_info;
 layout(location = 1) flat out uint out_shape_type;
 layout(location = 2) out vec2 out_local_pos;
-layout(location = 3) out float out_value_1; // used to make shape size
-layout(location = 4) out float out_value_2; // used to make shape size
+layout(location = 3) flat out float out_value_1; // used to make shape size
+layout(location = 4) flat out float out_value_2; // used to make shape size
+layout(location = 5) flat out float out_value_3; // used to make shape size
 
 layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
     vec2 camera_pos;
@@ -23,6 +26,7 @@ layout(binding = 0, set = 0) uniform restrict readonly UniformBufferObject {
 const int Circle = 0;
 const int Square = Circle+1;
 const int Capsule = Square+1;
+const int Trapezoid = Capsule+1;
 
 //padding for smooth edges
 const float SIZE_MULTIPLIER = 1.02;
@@ -31,19 +35,40 @@ const float SIZE_MULTIPLIER = 1.02;
 vec2 get_shape_shift(){
     vec2 shift;
     
-    if (shape_type == Circle) {
-        // value_1 is radius
-        shift = vec2(value_1);
-        shift *= SIZE_MULTIPLIER; //padding for smooth edges
-    }
-    else if (shape_type == Square) {
-        // value_1 is width/2,  value_2 is height/2
-        shift = vec2(value_1, value_2); // Bounding box extends half the width/height from center
-    }
-    else if (shape_type == Capsule) {
-        // value_1 is radius, value_2 is length/2
-        shift = vec2(value_2 + value_1, value_1); // Horizontal length + radius at both ends
-        shift *= SIZE_MULTIPLIER;
+    switch (shape_type){
+        case (Circle): {
+            // value_1 is radius
+            shift = vec2(value_1);
+            shift *= SIZE_MULTIPLIER; //padding for smooth edges
+            break;
+        }
+        case (Square): {
+            // value_1 is width/2,  value_2 is height/2
+            shift = vec2(value_1, value_2); // Bounding box extends half the width/height from center
+            break;
+        }
+        case (Capsule): {
+            // value_1 is radius, value_2 is length/2
+            shift = vec2(value_2 + value_1, value_1); // Horizontal length + radius at both ends
+            shift *= SIZE_MULTIPLIER;
+            break;
+        }
+        case (Trapezoid): {
+            // an 'isosceles' one, which means vertically symmetrical 
+            // Trapezoid is made almost like a square, but 
+            int effective_index = (gl_VertexIndex >= 3)? (gl_VertexIndex-2) : (gl_VertexIndex);
+            if(effective_index < 2){
+                //bottom
+                shift.x = value_1;
+            } else {
+                //top
+                shift.x = value_2;
+            }
+            shift.y = +value_3;
+            //TODO:
+            // shift *= SIZE_MULTIPLIER;
+            break;
+        }
     }
     return shift;
 }
@@ -52,24 +77,22 @@ vec2 get_shape_shift(){
 vec2 get_vertex_pos(){
     vec2 shift = get_shape_shift();
     vec2 position;
-    if ((gl_VertexIndex == 0) || (gl_VertexIndex == 3)) {
-        position = vec2(-shift.x, -shift.y); // Bottom-left
-    }
-    else if ((gl_VertexIndex == 1)) {
-        position = vec2( shift.x, -shift.y); // Bottom-right
-    }
-    else if ((gl_VertexIndex == 2) || (gl_VertexIndex == 4)) {
-        position = vec2( shift.x,  shift.y); // Top-right
-    }
-    else if ((gl_VertexIndex == 5)) {
-        position = vec2(-shift.x,  shift.y); // Top-left
-    }
+    vec2 corner; // specifies shift direction
+    int effective_index = (gl_VertexIndex >= 3)? (gl_VertexIndex-2) : (gl_VertexIndex);
+    corner.x = float((effective_index%2) == 0); 
+    corner.y = float((effective_index/2)); 
+    //0/1 -> -1/+1
+    corner = corner*2.0 - 1.0;
+
+    position = corner * shift;
     return position;
 }
 
 void main() 
 {
     vec2 local_pos = get_vertex_pos();
+    mat2 mrot = mat2(rotation.x, rotation.y, -rotation.y, rotation.x);
+    local_pos *= mrot;
     vec2 world_pos = global_pos + local_pos;
     
     out_coloring_info = coloring_info;
@@ -77,6 +100,7 @@ void main()
     out_local_pos = local_pos;
     out_value_1 = value_1;
     out_value_2 = value_2;
+    out_value_3 = value_3;
 
     vec2 relative_pos = world_pos - ubo.camera_pos;
     // vec2 relative_pos = world_pos;

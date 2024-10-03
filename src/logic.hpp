@@ -24,6 +24,18 @@ enum class SceneState {
     Menu,
 };
 
+//there is no actual reason to draw them separately
+//it potentially saves like 2 bytes, which is nothing
+//and for less than 50k states change would probably be more harmfull
+//still have to be copied twice tho
+struct Particle{
+    Shape shape;
+    // vec2 vel;
+    float lifetime;
+    void draw(VisualView* view);
+    void update(float dTime);
+};
+
 // somewhat like a full-game-object 
 // TODO: separate menu from game (or should i?)
 class LogicalScene {
@@ -51,6 +63,7 @@ public:
 
     // is called once game match begins
     void addNewPlayer(/*some visual props*/);
+    void resetPlayersState();
     // is called in the end of the match
     void removeAllPlayers();
     
@@ -62,16 +75,19 @@ public:
     void    removeProjectile(ListElem<Projectile>* projectile);
     void removeAllProjectiles();
 
-    // void addPlayerToWorld(Player* player);
-    // void addSceneryToWorld(Scenery* scenery, const std::vector<b2Vec2>& vertices);
-    // void addProjectileToWorld(Projectile* projectile);
+    void startNewRound();
+    void endRound();
+    void genRndScenery();
 
     void clearWorld(void);
 
     SceneState current_state;
 
-private:
+    vector<Particle> particles;
+    void addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, float lifetime);
+    void updateDrawParticles();
 
+private:
     using collisionProcessFun = std::function<void(ActorType, void*, ActorType, void*)>;
     // template <typename b2ContactEvent> 
     void processCollisionEvent(auto& touch, collisionProcessFun caseProcessor) {
@@ -87,7 +103,7 @@ private:
     void processBeginEvents(b2ContactEvents contacts);
     void processEndEvents(b2ContactEvents contacts);
     void processHitEvents(b2ContactEvents contacts);
-    void processMoveEvents(b2BodyEvents moves);
+    void processMoveEvents(b2BodyEvents moves, float dTime);
 
     // double getTime() {return glfwGetTime();}
 };

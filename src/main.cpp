@@ -17,9 +17,10 @@ l()
 l()
     logic.addNewPlayer();
 l()
-    logic.addScenery(Scenery(Square, {.SQUARE_half_width=1, .SQUARE_half_height=3}, vec2(-3,0), false));
+    logic.addScenery(Scenery(Trapezoid, {.TRAPEZOID_half_bottom_size=5, .TRAPEZOID_half_top_size=2, .TRAPEZOID_half_height=2.5,}, vec2(-3,0), false));
+    logic.genRndScenery();
 
-    logic.addScenery(Scenery(Square, {.SQUARE_half_width=9, .SQUARE_half_height=1}, vec2(2,-1), false));
+    // logic.addScenery(Scenery(Square, {.SQUARE_half_width=9, .SQUARE_half_height=1}, vec2(2,-1), false));
 l()
     // Main loop
     double previous = 0;

@@ -8,7 +8,8 @@ InputHandler::InputHandler() {
     keyActionMap[GLFW_KEY_D] = Action::MoveRight;
     keyActionMap[GLFW_KEY_SPACE] = Action::Jump;
     keyActionMap[GLFW_KEY_ESCAPE] = Action::Menu;
-    keyActionMap[GLFW_KEY_ENTER] = Action::Confirm;
+    // keyActionMap[GLFW_KEY_ENTER] = Action::Confirm;
+    keyActionMap[GLFW_KEY_ENTER] = Action::DrawRNDcard;
 
     mouseActionMap[GLFW_MOUSE_BUTTON_LEFT] = Action::Shoot;
     mouseActionMap[GLFW_MOUSE_BUTTON_RIGHT] = Action::Block;
@@ -32,6 +33,7 @@ InputHandler::InputHandler() {
     actionTypeMap[Action::Confirm] = ActionType::OneShot;
     actionTypeMap[Action::Block] = ActionType::OneShot;
     actionTypeMap[Action::Shoot] = ActionType::OneShot;
+    actionTypeMap[Action::DrawRNDcard] = ActionType::OneShot;
 }
 
 void InputHandler::rebindKey(Action action, int newKey) {

@@ -9,12 +9,12 @@ public:
     //first for custom rtti :)
     Actor actor;
     Scenery() : 
-        actor(ActorType::Scenery, b2_staticBody, b2_circleShape, \
+        actor(ActorType::Scenery, b2_staticBody, Circle, \
             twpp::pink(700), vec2(0), {.value_1 = 1., .value_2 = 1.}),
         props{} {} //TODO
 
     Scenery(ShapeType type, ShapeProps shapeProps, vec2 pos, bool dynamic) : 
-        actor(ActorType::Scenery, (dynamic? b2_dynamicBody : b2_staticBody), convertShapeType(type), \
+        actor(ActorType::Scenery, (dynamic? b2_dynamicBody : b2_staticBody), (type), \
             twpp::pink(700), pos, shapeProps),
         props{} {} //TODO
     
@@ -25,5 +25,6 @@ public:
     struct SceneryProps props;
     
     Shape constructShape();
+    void draw(VisualView* view);
 };
 #endif // __SCENERY_HPP__

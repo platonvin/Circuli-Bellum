@@ -15,15 +15,19 @@ public:
     Actor actor;
 
     Projectile() : 
-        actor(ActorType::Projectile, b2_dynamicBody, b2_circleShape, \
+        actor(ActorType::Projectile, b2_dynamicBody, Circle, \
             twpp::pink(700), vec2(0), {.CIRCLE_radius = 1}) {}
             
     Projectile(double damage, float radius) : 
-        actor(ActorType::Projectile, b2_dynamicBody, b2_circleShape, \
+        actor(ActorType::Projectile, b2_dynamicBody, Circle, \
             twpp::pink(700), vec2(0), {.CIRCLE_radius = radius}),
         props{.damage=damage, .radius=radius} {}
 
-    void update(PhysicalWorld* world /*for later?*/){}
+    void setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor);
+
+    void update(PhysicalWorld* world /*for later?*/, float dTime);
+    void updateTrailData();
+    void drawTrail(VisualView* view);
     void addToWorld(PhysicalWorld* world);
     //return false if destroy
     bool processSceneryHit(SceneryState* scenery);
@@ -33,5 +37,11 @@ public:
     struct ProjectileProps props;
     
     Shape constructShape();
+    void draw(VisualView* view);
+
+    //for a bullet trail
+    std::array<vec2, 10> oldPositions = {};
+    float time_elapsed = 0;
+    
 };
 #endif // __PROJECTILE_HPP__

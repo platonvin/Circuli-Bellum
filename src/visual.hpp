@@ -16,11 +16,15 @@ enum ShapeType : unsigned char{
     Circle,
     Square,
     Capsule,
+    Trapezoid,
 };
 
 enum ColoringType : unsigned char{
     SolidColor,
     RandomColor,
+    FBMstyle,
+    LEDstyle,
+    GRIDstyle,
     COLORING_TYPE_SIZE,
 };
 
@@ -36,9 +40,15 @@ typedef union ShapeProps {
         float CAPSULE_radius;
         float CAPSULE_half_length;
     };
+    struct{
+        float TRAPEZOID_half_bottom_size;
+        float TRAPEZOID_half_top_size;
+        float TRAPEZOID_half_height;
+    };
     struct{ // for attributes
-        float value_1 = 69.420; // for easy debugging
-        float value_2 = 69.420; // for easy debugging
+        float value_1 = 69.421; // for easy debugging
+        float value_2 = 69.422; // for easy debugging
+        float value_3 = 69.423; // for easy debugging
     };
 } ShapeProps;
 
@@ -46,6 +56,7 @@ typedef struct Shape {
     u8vec3 coloring_info; // Solid color AND anything else for non-solid-color coloringType
     ShapeType shapeType;
     vec2 pos;
+    vec2 rot = vec2(1,0);
 
     ShapeProps props;
     // TODO: char size?
