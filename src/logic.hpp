@@ -86,6 +86,7 @@ public:
     vector<Particle> particles;
     void addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, float lifetime);
     void updateDrawParticles();
+    void addEffect(u8vec3 color, vec2 pos, int numParticles, float maxOffset, float maxVel, float size, float lifetime);
 
 private:
     using collisionProcessFun = std::function<void(ActorType, void*, ActorType, void*)>;

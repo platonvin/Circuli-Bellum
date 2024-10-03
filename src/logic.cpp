@@ -222,6 +222,8 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
                 Scenery* scenery = (typeA == ActorType::Scenery) ? (Scenery*)(udataA) : (Scenery*)(udataB);
                 //possibly damage scenery, bounce/kill bullet
+                // addParticle(twpp::emerald(500), projectile->actor.state.pos, vec2(0), 0.1, 1.0);
+                addEffect(twpp::emerald(500), projectile->actor.state.pos, 20, 0.1, 0, 0.1, 1.0);
                 bool survived = projectile->processSceneryHit(&scenery->state);
                 if(!survived){
                     // body_garbage.push_back(projectile->actor.bindings.body);
@@ -423,6 +425,25 @@ void LogicalScene::addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, flo
         p.shape.props = {.CIRCLE_radius = size};
         p.shape.pos = pos;
     p.lifetime = lifetime;
+
+    particles.push_back(p);
+}
+
+//TODO c-rand vs c++-gen
+float randFloat(float min, float max) {
+    return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (max - min)));
+}
+
+// Function to add particles with random offsets and velocities
+void LogicalScene::addEffect(u8vec3 color, vec2 pos, int numParticles, float maxOffset, float maxVel, float size, float lifetime) {
+    for (int i = 0; i < numParticles; i++) {
+        vec2 offset = vec2(randFloat(-maxOffset, maxOffset), randFloat(-maxOffset, maxOffset));
+        vec2 particlePos = pos + offset;
+
+        vec2 vel = vec2(randFloat(-maxVel, maxVel), randFloat(-maxVel, maxVel));
+
+        addParticle(color, particlePos, vel, size, lifetime);
+    }
 }
 
 void Particle::draw(VisualView* view){
