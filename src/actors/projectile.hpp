@@ -21,6 +21,7 @@ public:
     Projectile(double damage, float radius) : 
         actor(ActorType::Projectile, b2_dynamicBody, Circle, \
             twpp::pink(700), vec2(0), {.CIRCLE_radius = radius}),
+        state{.damage=damage, .radius=radius},
         props{.damage=damage, .radius=radius} {}
 
     void setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor);

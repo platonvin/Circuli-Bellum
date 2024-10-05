@@ -71,7 +71,7 @@ public:
     Actor(ActorType actorType, b2BodyType bodyType, ShapeType shapeType, u8vec3 coloring_info, vec2 pos, ShapeProps shapeProps) : 
         actorType{actorType}, 
         state{.pos=pos},
-        properties{ .color=coloring_info, .body_type=bodyType, .shape_type=shapeType},
+        properties{ .color=coloring_info, .shape_type=shapeType, .body_type=bodyType},
         shapeProps(shapeProps) {}
     
     Shape constructActorShape();
@@ -101,7 +101,7 @@ struct PlayerProps{
     int max_jumps = 1;
     float jump_impulse = 20;
     float mass = 1.0f;
-    float radius = 1.0;
+    float radius = 0.5;
     float bullet_radius = 0.1;
     double damage = 15;
     double reload_time = 2; //between closest shots from separate magazines

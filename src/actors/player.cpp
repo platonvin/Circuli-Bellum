@@ -13,23 +13,25 @@ void Player::processBulletHit(PhysicalWorld* world, ProjectileState* projectile)
 Shape Player::constructShape(){
     Shape shape = actor.constructActorShape();
         shape.shapeType = Circle;
-        //overwrites
         shape.props.CIRCLE_radius = props.radius;
-    // pl(shape.pos.x);
-    // pl(shape.pos.y);
-    // pl(shape.props.CIRCLE_radius);
+        //overwrites
+        shape.pos = visual_pos;
     return shape;
 }
 
-void Player::softLimitVelocity(PhysicalWorld* world){
-    vec2 current_vel = world->getVelocity(actor.bindings.body);
-    vec2 desired_vel = vec2(1);
-    float current_len = glm::length(current_vel);
-    float desired_len = glm::length(desired_vel);
-    if(current_len > desired_len){
-        vec2 force_direction = -glm::normalize(current_vel);
-        float ldiff = (current_len - desired_len);
-        world->applyForce(actor.bindings.body, glm2b(force_direction*ldiff*2.0f));
+// for X only
+void Player::softLimitVelocity(PhysicalWorld* world) {
+    vec2 current_vel = actor.state.vel;
+    float current_x_vel = current_vel.x;
+
+    float desired_x_vel = 1.0f;  // desired X velocity
+    
+    if (fabs(current_x_vel) > desired_x_vel) {
+        float excess_x_vel = current_x_vel - glm::sign(current_x_vel) * desired_x_vel;
+        
+        vec2 force = vec2(-excess_x_vel * 2.0f, 0.0f);
+        
+        world->applyForce(actor.bindings.body, glm2b(force));
     }
 }
 
@@ -48,6 +50,14 @@ void Player::update(PhysicalWorld* world /*for later?*/, vec2 view_pos){
     softLimitVelocity(world);
     refillJumpsIfNeeded();
 
+    // if(actor.state.vel.y > -0.01){
+    //     b2Body_SetGravityScale(actor.bindings.body, 2.0);
+    // } else {
+    //     b2Body_SetGravityScale(actor.bindings.body, 2.0);
+    // }
+
+    state.damage = props.damage;
+    // state.
     state.aim_direction = normalize(view_pos - actor.state.pos);
 }
 
@@ -65,9 +75,112 @@ void Player::addToWorld(PhysicalWorld* world){
 // void Player::removeFromWorld(PhysicalWorld* world){
 // }
 
-void Player::draw(VisualView* view){
-    view->draw_dynamic_shape(constructShape(), FBMstyle);
+
+void Player::draw(VisualView* view) {
+    // pl(int(actor.properties.color.x))
+    drawBody(view);
+    // drawArmsAndGun(view);
+    drawLegs(view);
+    // drawBullets(view);
 }
+
+void Player::drawBody(VisualView* view) {
+    Shape shape = actor.constructActorShape();
+        shape.shapeType = Circle;
+        shape.props.CIRCLE_radius = props.radius;
+        //overwrites
+        shape.pos = visual_pos;
+    view->draw_dynamic_shape(constructShape(), SolidColor);
+}
+
+void Player::drawLegs(VisualView* view) {
+    const float legLength = props.radius * 0.33f; // Length of each leg
+    const float legRardius = props.radius * 0.15f; // width?
+    const float legRotationOut = glm::pi<float>()/2.0;
+    const float legRotationIn  = glm::pi<float>()/2.0;
+
+    float legDirection = glm::sign(actor.state.vel.x);
+
+    vec2 legOffset = vec2(props.radius, props.radius) / sqrtf(2.0);
+
+    vec2 somewhatInbetweenPos = (visual_pos + actor.state.pos) / 2.f;
+
+    vec2 leg1Pos1 = somewhatInbetweenPos + vec2(-legOffset.x, -legOffset.y); // Start point at the body
+    vec2 leg1Pos2 = leg1Pos1 + vec2(0.0, -(legLength + legRardius)); // First segment end (outward)
+    vec2 leg1Pos3 = leg1Pos2 + vec2(0.0, -(legLength + legRardius)); // Second segment end (inward)
+
+    vec2 leg2Pos1 = somewhatInbetweenPos + vec2(+legOffset.x, -legOffset.y);
+    vec2 leg2Pos2 = leg2Pos1 + vec2(0.0, -(legLength + legRardius));
+    vec2 leg2Pos3 = leg2Pos2 + vec2(0.0, -(legLength + legRardius));
+
+    Shape leg1Shape1, leg1Shape2;
+        leg1Shape1.coloring_info = actor.properties.color;
+        leg1Shape1.pos = leg1Pos1;
+        leg1Shape1.shapeType = Capsule;
+        leg1Shape1.props.CAPSULE_radius = legRardius; 
+        leg1Shape1.props.CAPSULE_half_length = legLength / 2.0f;
+
+        leg1Shape2 = leg1Shape1;
+        leg1Shape2.pos = leg1Pos2;
+
+    Shape leg2Shape1, leg2Shape2;
+        leg2Shape1 = leg1Shape1;
+        leg2Shape1.pos = leg2Pos1;
+
+        leg2Shape2 = leg2Shape1;
+        leg2Shape2.pos = leg2Pos2;
+
+
+    leg1Shape1.rot_angle = -glm::pi<float>() / 2.0;
+    leg1Shape2.rot_angle = -glm::pi<float>() / 2.0;
+    leg2Shape1.rot_angle = -glm::pi<float>() / 2.0;
+    leg2Shape2.rot_angle = -glm::pi<float>() / 2.0;
+
+    float curve_angle = glm::pi<float>()/7.0;
+    // if floating
+    // TODO: random wobble
+    if(state.touching_grass_counter > 0){
+        if(legDirection == -1){
+            //then all to the left 
+            //defenetely first try guessed sign
+            leg1Shape1.rot_angle += +curve_angle;
+            leg1Shape2.rot_angle += -curve_angle;
+            leg2Shape1.rot_angle += +curve_angle;
+            leg2Shape2.rot_angle += -curve_angle;    
+        }
+        if(legDirection == +1){
+            //then all to the right 
+            leg1Shape1.rot_angle += -curve_angle;
+            leg1Shape2.rot_angle += +curve_angle;
+            leg2Shape1.rot_angle += -curve_angle;
+            leg2Shape2.rot_angle += +curve_angle;    
+        }
+        if(legDirection == 0){
+            //then all outside
+            leg1Shape1.rot_angle += +curve_angle;
+            leg1Shape2.rot_angle += -curve_angle;
+            leg2Shape1.rot_angle += -curve_angle;
+            leg2Shape2.rot_angle += +curve_angle;    
+        }
+    } else {
+        //increase length!
+        leg1Shape2.props.CAPSULE_half_length *= 1.6;
+        leg2Shape2.props.CAPSULE_half_length *= 1.6;
+    }
+    view->draw_dynamic_shape(leg1Shape1, SolidColor);
+    view->draw_dynamic_shape(leg1Shape2, SolidColor);
+    view->draw_dynamic_shape(leg2Shape1, SolidColor);
+    view->draw_dynamic_shape(leg2Shape2, SolidColor);
+}
+
+void Player::drawArmsAndGun(VisualView* view) {
+
+}
+
+void Player::drawAmmo(VisualView* view) {
+
+}
+
 
 void Player::drawCard(Card card) {
     props.hp *= card.hp_buff;
@@ -88,4 +201,20 @@ void Player::drawCard(Card card) {
     }
     props.bullet_bounces += card.bullet_bounce_buff;
     props.knockback *= card.knockback_buff;
+
+    //constrains
+    props.bullet_radius = glm::clamp(props.bullet_radius, 0.01f, 2.f);
+}
+
+// damper for better visuals. Breaks on high frame times. Causes AaAaAa in the beginning
+void Player::updateVisualPos(float dTime) {
+    vec2 target_pos = actor.state.pos;
+    vec2 displacement = target_pos - visual_pos;
+
+    vec2 springForce = springConstant * displacement;
+    vec2 dampingForce = -dampingFactor * visual_vel;
+    vec2 totalForce = springForce + dampingForce;
+
+    visual_vel += totalForce * dTime;
+    visual_pos += visual_vel * dTime;
 }

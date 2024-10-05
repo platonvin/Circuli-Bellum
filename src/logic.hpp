@@ -30,10 +30,10 @@ enum class SceneState {
 //still have to be copied twice tho
 struct Particle{
     Shape shape;
-    // vec2 vel;
+    vec2 vel;
     float lifetime;
     void draw(VisualView* view);
-    void update(float dTime);
+    void update(double dTime);
 };
 
 // somewhat like a full-game-object 
@@ -54,7 +54,7 @@ public:
     void cleanup(void);
     void setupActionCallbacks();
 
-    void tick(float dTime);
+    void tick(double dTime);
 
     void loadScene(); //TODO: from file?
 
@@ -86,9 +86,24 @@ public:
     vector<Particle> particles;
     void addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, float lifetime);
     void updateDrawParticles();
-    void addEffect(u8vec3 color, vec2 pos, int numParticles, float maxOffset, float maxVel, float size, float lifetime);
+    void addEffect(
+        u8vec3 baseColor, u8 colorVariation, 
+        vec2 basePos, float posVariation, 
+        vec2 baseVel, float velVariation, 
+        float baseSize, float sizeVariation, 
+        float baseLifetime, float lifetimeVariation, 
+        int numParticles);
 
-private:
+    //effect presets. Just shortucts, no logic
+    void BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery);
+    void BulletPlayerHitEffect(Projectile* bullet, Player* player);
+    void BulletBullethitEffect(Projectile* bullet1, Projectile* bullet2);
+    void PlayerJumpEffect(Player* player);
+    void PlayerDieEffect(Player* player);
+    void PlayerSceneryHitEffect(Player* player, Scenery* scnery);
+
+    void drawHpBar(Player* player);
+
     using collisionProcessFun = std::function<void(ActorType, void*, ActorType, void*)>;
     // template <typename b2ContactEvent> 
     void processCollisionEvent(auto& touch, collisionProcessFun caseProcessor) {
@@ -96,15 +111,15 @@ private:
         void* udataA = b2Shape_GetUserData(touch.shapeIdA);
         void* udataB = b2Shape_GetUserData(touch.shapeIdB);
         assert(udataA && udataB);
-        ActorType typeA = static_cast<Actor*>(udataA)->actorType;
-        ActorType typeB = static_cast<Actor*>(udataB)->actorType;
+        ActorType typeA = ((Actor*)(udataA))->actorType;
+        ActorType typeB = ((Actor*)(udataB))->actorType;
         caseProcessor(typeA, udataA, typeB, udataB); 
     }
 
     void processBeginEvents(b2ContactEvents contacts);
     void processEndEvents(b2ContactEvents contacts);
     void processHitEvents(b2ContactEvents contacts);
-    void processMoveEvents(b2BodyEvents moves, float dTime);
+    void processMoveEvents(b2BodyEvents moves, double dTime);
 
     // double getTime() {return glfwGetTime();}
 };

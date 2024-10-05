@@ -44,7 +44,7 @@ using glm::vec2;
 // basically does nothing. 
 class PhysicalWorld {
 public:
-    void setup(b2Vec2 _gravity = {0, -17.}) {
+    void setup(b2Vec2 _gravity = {0, -55.}) {
         gravity = _gravity;
         b2WorldDef worldDef = b2DefaultWorldDef();
         world_id = b2CreateWorld(&worldDef);
@@ -88,10 +88,11 @@ struct PhysicalState {
 };
 struct PhysicalProperties {
     glm::u8vec3 color = twpp::purple(500);
-    float friction = 0.3;
-    b2BodyType body_type = b2_staticBody;
-    // not aligned with view ShapeType. They are just different
     ShapeType shape_type = Circle;
+    b2BodyType body_type = b2_staticBody;
+    float friction = 0.3;
+    //extra radius applied AFTER every sdf
+    float rounding_radius = 0;
 };
 struct PhysicalBindings {
     b2BodyId body = {};

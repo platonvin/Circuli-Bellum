@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-//TODO test arena (storage+free_idxs), fake ptrs  
+//TODO test arena (storage+free_idxs), fake ptrs. Arena to decrease alloc overhead
 
 template <class StoredClass>
 struct alignas(8) ListElem {

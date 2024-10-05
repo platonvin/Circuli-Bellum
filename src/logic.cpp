@@ -13,10 +13,10 @@ void LogicalScene::removeScenery(ListElem<Scenery>* se){
     sceneries.removeElem(se);
 }
 void LogicalScene::removeAllScenery() {
-    for (let scenery : sceneries) {
+    for (mut scenery : sceneries) {
         b2DestroyBody(scenery.actor.bindings.body);
     }
-    projectiles.removeAll();
+    sceneries.removeAll();
 }
 
 void LogicalScene::addProjectile(Projectile projectile) {
@@ -34,7 +34,7 @@ void LogicalScene::removeProjectile(ListElem<Projectile>* pe) {
 }
 
 void LogicalScene::removeAllProjectiles() {
-    for (let projectile : projectiles) {
+    for (mut projectile : projectiles) {
         b2DestroyBody(projectile.actor.bindings.body);
     }
     projectiles.removeAll();
@@ -44,20 +44,19 @@ void LogicalScene::removeAllProjectiles() {
 // players travel between worlds, everything else doesnt
 
 void LogicalScene::addNewPlayer(/*some visual props*/) {
-    Player player = Player(1, 2.2);
+    Player player = Player();
     player.actor.state.pos.y = 8.0;
-    player.props.radius = 1.0;
     ListElem<Player>* new_e = players.appendBack(player);
     new_e->obj()->addToWorld(&world);
 }
 void LogicalScene::removeAllPlayers() {
-    for (let player : players) {
+    for (mut player : players) {
         b2DestroyBody(player.actor.bindings.body);
     }
     players.removeAll();
 }
 void LogicalScene::resetPlayersState() {
-    for (let player : players) {
+    for (mut player : players) {
         player.state.jumps_left = player.props.max_jumps;
         player.state.touching_grass_counter = 0;
         player.state.refill_jumps_next_frame = false;
@@ -126,10 +125,13 @@ void LogicalScene::setupActionCallbacks() {
             // pl(controlled_player->state.jumps_left)
             if(controlled_player->state.jumps_left > 0){
                 // npl("JUMP");
-                world.applyImpulse(controlled_player->actor.bindings.body, 
-                    b2Vec2(0,20.0));
+                PlayerJumpEffect(controlled_player);
+                vec2 old_vel = world.getVelocity(controlled_player->actor.bindings.body);
+                world.setVelocity(controlled_player->actor.bindings.body, {old_vel.x, 15.0});
+                // world.applyImpulse(controlled_player->actor.bindings.body, 
+                //     b2Vec2(0,20.0));
                 auto t = b2Body_GetTransform(controlled_player->actor.bindings.body);
-                t.p.y += 0.001;
+                t.p.y += 0.01;
                 b2Body_SetTransform(controlled_player->actor.bindings.body, t.p, t.q);
                 controlled_player->state.jumps_left--;
 
@@ -140,10 +142,10 @@ void LogicalScene::setupActionCallbacks() {
     );
     input.setActionCallback(Action::Shoot, 
         [this](Action action) -> void {
-            static int counter=0;
-            counter++;
+            // static int counter=0;
+            // counter++;
             pl("shoot")
-            pl(counter)
+            pl(controlled_player->props.damage)
             //TODO: restructure
             // Player* p = players._start->obj();
             auto bullet = Projectile(controlled_player->props.damage, controlled_player->props.bullet_radius);
@@ -165,6 +167,11 @@ void LogicalScene::setupActionCallbacks() {
     );
     input.setActionCallback(Action::MoveLeft, 
         [this](Action action) -> void {
+            vec2 old_vel = world.getVelocity(controlled_player->actor.bindings.body);
+            if(old_vel.x > -1.0){
+                // world.setVelocity(controlled_player->actor.bindings.body, {-1, old_vel.y});
+                world.applyImpulse(controlled_player->actor.bindings.body, {-1, 0});
+            }
             world.applyForce(controlled_player->actor.bindings.body, 
                 b2Vec2(-20.f,0.1));
             
@@ -173,6 +180,11 @@ void LogicalScene::setupActionCallbacks() {
     );
     input.setActionCallback(Action::MoveRight, 
         [this](Action action) -> void {
+            vec2 old_vel = world.getVelocity(controlled_player->actor.bindings.body);
+            if(old_vel.x < 1.0){
+                world.applyImpulse(controlled_player->actor.bindings.body, {+1, 0});
+                // world.setVelocity(controlled_player->actor.bindings.body, {1, old_vel.y});
+            }
             world.applyForce(controlled_player->actor.bindings.body, 
                 b2Vec2(+20.f,0.1));
         // al()
@@ -222,8 +234,8 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
                 Scenery* scenery = (typeA == ActorType::Scenery) ? (Scenery*)(udataA) : (Scenery*)(udataB);
                 //possibly damage scenery, bounce/kill bullet
-                // addParticle(twpp::emerald(500), projectile->actor.state.pos, vec2(0), 0.1, 1.0);
-                addEffect(twpp::emerald(500), projectile->actor.state.pos, 20, 0.1, 0, 0.1, 1.0);
+                // smoke
+                BulletSceneryHitEffect(projectile, scenery);
                 bool survived = projectile->processSceneryHit(&scenery->state);
                 if(!survived){
                     // body_garbage.push_back(projectile->actor.bindings.body);
@@ -239,17 +251,20 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 // al()
                 Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
                 Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
+                pl(projectile->state.damage);
+                pl(projectile->props.damage);
 
                 bool survived = projectile->processPlayerHit(&player->state);
                 if(!survived){
                     body_garbage.push_back(projectile->actor.bindings.body);
                     projectiles.softRemoveElem((ListElem<Projectile>*)projectile);
+                    BulletPlayerHitEffect(projectile, player);
                 }
                 if(player != controlled_player){
                     player->processBulletHit(&world, &projectile->state);
                     vec2 impulse = 
                         normalize(projectile->actor.state.vel) *
-                        float(projectile->state.damage);
+                        log2(float(projectile->state.damage));
                     world.applyImpulse(player->actor.bindings.body, glm2b(impulse));
 
                 }
@@ -305,7 +320,7 @@ void LogicalScene::processHitEvents(b2ContactEvents contacts){
     }
 }
 
-void LogicalScene::processMoveEvents(b2BodyEvents moves, float dTime){
+void LogicalScene::processMoveEvents(b2BodyEvents moves, double dTime){
     for(int i=0; i<moves.moveCount; i++){
         auto& move = moves.moveEvents[i];
         // Actually, it is pointer to Player/Scenery/Projectile, but Actor is thir first member
@@ -321,6 +336,8 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves, float dTime){
 
             vec2 mouse_wpos = (vec2((input.mousePosf)/dvec2(1920,1080))*2.f - 1.f) * view.camera.cameraScale;
             player->update(&world, (mouse_wpos));
+            player->updateVisualPos(dTime);
+
         }
         if(actor->actorType == ActorType::Projectile){
             Projectile* bullet = (Projectile*)actor; 
@@ -329,7 +346,7 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves, float dTime){
     }
 }
 
-void LogicalScene::tick(float dTime) {
+void LogicalScene::tick(double dTime) {
     input.pollUpdates();
     
 if(!glfwGetKey(view.render.window.pointer, GLFW_KEY_RIGHT_SHIFT)){
@@ -362,11 +379,13 @@ if(!glfwGetKey(view.render.window.pointer, GLFW_KEY_RIGHT_SHIFT)){
     int write_index = 0;
     for (int i = 0; i < particles.size(); i++) {
         //TODO:
-        bool should_keep = particles[i].shape.props.CIRCLE_radius > 0.001;
+        // bool should_keep = particles[i].shape.props.CIRCLE_radius > 0.001;
+        bool should_keep = particles[i].shape.props.CIRCLE_radius > 0.0025; // TODO until visible
         if (should_keep) {
             particles[write_index] = particles[i];
-            particles[write_index].lifetime -= dTime;
-            particles[write_index].shape.props.CIRCLE_radius *= (1-dTime/particles[write_index].lifetime);
+            particles[write_index].shape.pos += particles[write_index].vel * float(dTime);
+            // particles[write_index].lifetime -= dTime; // if enabled, then dTime/(0 /-value) might happen
+            particles[write_index].shape.props.CIRCLE_radius *= (1.0-dTime/particles[write_index].lifetime);
             write_index++;
         }
     }
@@ -379,25 +398,32 @@ if(!glfwGetKey(view.render.window.pointer, GLFW_KEY_RIGHT_SHIFT)){
     view.start_frame();
         view.start_main_pass();
 
+    Shape background = {};
+        background.shapeType = Square;
+        background.coloring_info = twpp::pink(200);
+        background.props.SQUARE_half_height = 10.0;
+        background.props.SQUARE_half_width = 1920/float(1080)*10.0;
+    view.draw_dynamic_shape(background, WAVYstyle);
+    
     // Draw everything. Basically reorders memory in specific buffers for GPU convenience
     //TODO static
-    
-    for(let p : players){
+    for(mut p : particles){
         p.draw(&view);
     }
-    for(let s : sceneries){
+    for(mut s : sceneries){
         s.draw(&view);
     }
-    for(let p : projectiles){
+    for(mut p : projectiles){
         p.draw(&view);
     }
-    for(let p : particles){
+    for(mut p : players){
         p.draw(&view);
+        drawHpBar(&p);
     }
 
     view.end_main_pass();
     
-    // view.bloom_pass();
+    view.bloom_pass();
     view.end_frame();
 
 }
@@ -406,8 +432,8 @@ Shape Actor::constructActorShape(){
     Shape shape = {};
         shape.coloring_info = properties.color;
         shape.pos = state.pos;
-        shape.rot = state.rot;
-        shape.props = shapeProps;
+        shape.rot_angle = b2Rot_GetAngle({state.rot.x, state.rot.y});
+        shape.rounding_radius = properties.rounding_radius;shape.props = shapeProps;
     return shape;
 }
 
@@ -424,31 +450,179 @@ void LogicalScene::addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, flo
         p.shape.shapeType = Circle;
         p.shape.props = {.CIRCLE_radius = size};
         p.shape.pos = pos;
+        p.vel = vel;
     p.lifetime = lifetime;
 
     particles.push_back(p);
 }
 
 //TODO c-rand vs c++-gen
+//quality is not required, so fast rand i believe is better
+//possible to simd. 
 float randFloat(float min, float max) {
-    return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (max - min)));
+    float rnd = min + float(rand()) / (float(RAND_MAX / (max - min)));
+    return rnd;
+}
+int randInt(int min, int max) {
+    return min + rand() % (max - min + 1);
 }
 
-// Function to add particles with random offsets and velocities
-void LogicalScene::addEffect(u8vec3 color, vec2 pos, int numParticles, float maxOffset, float maxVel, float size, float lifetime) {
+void LogicalScene::addEffect(
+    u8vec3 baseColor, u8 colorVariation, 
+    vec2 basePos, float posVariation, 
+    vec2 baseVel, float velVariation, 
+    float baseSize, float sizeVariation, 
+    float baseLifetime, float lifetimeVariation, 
+    int numParticles
+) {
     for (int i = 0; i < numParticles; i++) {
-        vec2 offset = vec2(randFloat(-maxOffset, maxOffset), randFloat(-maxOffset, maxOffset));
-        vec2 particlePos = pos + offset;
+        vec2 particlePos = basePos + vec2(randFloat(-posVariation, posVariation), randFloat(-posVariation, posVariation));
+        vec2 particleVel = baseVel + vec2(randFloat(-velVariation, velVariation), randFloat(-velVariation, velVariation));
 
-        vec2 vel = vec2(randFloat(-maxVel, maxVel), randFloat(-maxVel, maxVel));
+        u8vec3 modifiedColor = {
+            glm::clamp(int(baseColor.x) + randInt(-colorVariation, colorVariation), 0, 255),
+            glm::clamp(int(baseColor.y) + randInt(-colorVariation, colorVariation), 0, 255),
+            glm::clamp(int(baseColor.z) + randInt(-colorVariation, colorVariation), 0, 255)
+        };
 
-        addParticle(color, particlePos, vel, size, lifetime);
+        float particleSize = baseSize + randFloat(-sizeVariation, sizeVariation);
+        float particleLifetime = baseLifetime + randFloat(-lifetimeVariation, lifetimeVariation);
+
+        if(
+            (particleLifetime > 0) &&
+            (particleSize > 0) &&
+            true
+        ){
+            addParticle(modifiedColor, particlePos, particleVel, particleSize, particleLifetime);
+        }
     }
 }
 
 void Particle::draw(VisualView* view){
     view->draw_dynamic_shape(shape, SolidColor);
 }
-void Particle::update(float dTime){
-    shape.props.CIRCLE_radius *= (1.0 - dTime / lifetime);
+void Particle::update(double dTime){
+    shape.props.CIRCLE_radius *= (1.0 - (double)dTime / (double)lifetime);
+}
+
+//TODO explosion
+void LogicalScene::BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery){
+    //like smoke or smth
+    float R = bullet->state.radius;
+    addEffect(
+        twpp::zinc(800), // Base color
+        3,               // Color variation
+        bullet->actor.state.pos, // Base position
+        float(0),         // Position variation
+        vec2(0),         // Base velocity
+        float(R*2.0),     // Velocity variation
+        R*1.1,           // Base size
+        R*0.5,           // Size variation
+        bullet->state.radius*2.0, // Base lifetime
+        0.5,             // Lifetime variation
+        7                // Number of particles
+    );
+    
+    addEffect(
+        bullet->actor.properties.color,  // Base color
+        20,                              // Color variation
+        bullet->actor.state.pos,         // Base position
+        float(bullet->state.radius*2.0),  // Position variation
+        vec2(0),                         // Base velocity
+        float(1.7*bullet->state.radius),  // Velocity variation
+        bullet->state.radius/2.0,        // Base size
+        0.5,                             // Size variation
+        bullet->state.radius*2.0,        // Base lifetime
+        0.5,                             // Lifetime variation
+        20                               // Number of particles
+    );
+}
+
+void LogicalScene::BulletPlayerHitEffect(Projectile* bullet, Player* player){
+    addEffect(
+        player->actor.properties.color,   // Base color
+        20,                               // Color variation
+        (bullet->actor.state.pos + player->actor.state.pos) / 2.0f, // Base position (midpoint between bullet and player for more stability)
+        (bullet->state.radius*2.0),   // Position variation
+        vec2(0),                          // Base velocity
+        (1.7*bullet->state.radius),   // Velocity variation
+        player->props.radius / 5.0,       // Base size
+        0.5,                              // Size variation
+        bullet->state.radius*2.0,         // Base lifetime
+        0.5,                              // Lifetime variation
+        10                                // Number of particles
+    );
+
+    addEffect(
+        bullet->actor.properties.color,   // Base color
+        20,                               // Color variation
+        bullet->actor.state.pos,          // Base position
+        (bullet->state.radius*2.0),   // Position variation
+        vec2(0),                          // Base velocity
+        (1.7*bullet->state.radius),   // Velocity variation
+        bullet->state.radius / 5.0,       // Base size
+        0.5,                              // Size variation
+        bullet->state.radius*2.0,         // Base lifetime
+        0.5,                              // Lifetime variation
+        10                                // Number of particles
+    );}
+
+void LogicalScene::BulletBullethitEffect(Projectile* bullet1, Projectile* bullet2){
+
+}
+
+void LogicalScene::PlayerJumpEffect(Player* player){
+    vec2 player_bottom = player->actor.state.pos;
+        player_bottom.y -= player->props.radius;
+
+    addEffect(
+        player->actor.properties.color,   // Base color
+        20,                               // Color variation
+        player_bottom,                    // Base position
+        (player->props.radius / 2.0), // Position variation
+        vec2(0),                          // Base velocity
+        (player->props.radius),       // Velocity variation
+        player->props.radius / 7.0,       // Base size
+        0.5,                              // Size variation
+        player->props.radius / 5.0,       // Base lifetime
+        0.5,                              // Lifetime variation
+        20                                // Number of particles
+    );
+}
+
+void LogicalScene::PlayerDieEffect(Player* player){
+
+}
+
+void LogicalScene::PlayerSceneryHitEffect(Player* player, Scenery* scnery){
+
+};
+
+void LogicalScene::drawHpBar(Player* player) {
+    float barWidth = player->props.radius*2.7;
+    float barHeight = player->props.radius*0.08;
+    float barYOffset = player->props.radius - 0.01;
+    vec2 barPosition = player->visual_pos + vec2(0, player->props.radius + barYOffset);
+
+    double maxHP = player->props.hp;
+    double currentHP = player->state.hp_left;
+
+    float filledBarWidth = float((currentHP / maxHP) * barWidth);
+
+    Shape barBack = {};
+        barBack.shapeType = Square;
+        barBack.coloring_info = twpp::slate(800);
+        barBack.props.SQUARE_half_width = (barWidth / 2.0f) * 1.1;
+        barBack.props.SQUARE_half_height = (barHeight / 2.0f) * 1.1;
+        barBack.pos = barPosition;
+
+    Shape barFill = {};
+        barFill.shapeType = Square;
+        barFill.coloring_info = twpp::lime(600);
+        barFill.props.SQUARE_half_width = filledBarWidth / 2.0f;
+        barFill.props.SQUARE_half_height = barHeight / 2.0f;
+        barFill.pos = barPosition - vec2((barWidth - filledBarWidth) / 2.0f, 0);
+
+    view.draw_dynamic_shape(barBack, SolidColor);
+    view.draw_dynamic_shape(barFill, SolidColor);
 }

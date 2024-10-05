@@ -91,9 +91,9 @@ void Projectile::drawTrail(VisualView* view) {
         glm::vec2 dirNorm = glm::normalize(direction);
         // if (glm::length(direction) < 0.01f) continue;
 
-        float angle = atan2(dirNorm.y, dirNorm.x);
+        float angle = atan2(dirNorm.x, dirNorm.y);
         // glm::vec2 rotation = glm::vec2(cos(angle), sin(angle));
-        glm::vec2 rotation = glm::vec2(sin(angle), cos(angle));
+        // glm::vec2 rotation = glm::vec2(sin(angle), cos(angle));
         // glm::vec2 rotation = glm::vec2(1, 0);
 
         // sizes are based on the segment index (first segment is wider, last is narrower)
@@ -104,7 +104,7 @@ void Projectile::drawTrail(VisualView* view) {
         Shape shape = Shape();
             shape.coloring_info = actor.properties.color;
             shape.pos = (prevPos + newPos) / 2.f;
-            shape.rot = rotation;
+            shape.rot_angle = angle; //set negative to get unique debugging experience
             shape.shapeType = Trapezoid;
             shape.props.TRAPEZOID_half_bottom_size = bottomHalfSize;
             shape.props.TRAPEZOID_half_top_size = topHalfSize;
@@ -119,15 +119,15 @@ void Projectile::drawTrail(VisualView* view) {
 
 void Projectile::setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor) {
     actor.state.pos = 
-    ownerActor->state.pos +
-    ownerState->aim_direction * (props.radius + ownerProps->radius + 0.1f);
-    // apl(ownerState.aim_direction.x);
-    // apl(ownerState.aim_direction.y);
+        ownerActor->state.pos +
+        ownerState->aim_direction * (props.radius + ownerProps->radius + 0.1f);
     actor.state.vel = 
         ownerState->aim_direction * 
-        float(ownerProps->bullet_speed)+
-        ownerActor->state.vel;
+        float(ownerProps->bullet_speed);
+        // actor.state.vel+=ownerActor->state.vel;
+    state.radius = props.radius;
     state.damage = ownerState->damage;
+    props.damage = ownerState->damage;
     actor.properties.color = ownerProps->bullet_color;
     state.bounces_left = ownerProps->bullet_bounces;
 

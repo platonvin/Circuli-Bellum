@@ -25,6 +25,9 @@ vec3 draw(in vec2 fragCoord ){
 }
 
 void main() {
-    vec3 color = draw(gl_FragCoord.xy);  // call render function
-    outColor = vec4(color, 1.0);  // output final fragment color
+    vec4 color = vec4(draw(gl_FragCoord.xy),1);
+    color.a *= getAlphaFromShape();
+    // color.a = 1;
+    // color.a = 10.1;
+    outColor = color;
 }

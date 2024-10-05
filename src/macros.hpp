@@ -6,8 +6,8 @@
 #include <cassert>
 
 //corrosion vibes
-//no mut btw
-#define let auto&
+#define mut auto&
+#define let const auto&
 
 // #define UNDEF_L_PL
 // #define UNDEF_AL_APL

@@ -79,6 +79,7 @@ SHADERS_EXTRA_DEPEND = \
 
 _SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.vert)
 _SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.frag)
+_SHADERS += $(wildcard $(SHADER_SRC_DIR)/*.comp)
 _TARGETS = $(patsubst $(SHADER_SRC_DIR)/%, $(SHADER_OUT_DIR)/%.spv, $(_SHADERS))
 
 $(SHADER_OUT_DIR)/%.spv: $(SHADER_SRC_DIR)/% $(SHADERS_EXTRA_DEPEND)

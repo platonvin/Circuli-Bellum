@@ -38,14 +38,14 @@ InputHandler::InputHandler() {
 
 void InputHandler::rebindKey(Action action, int newKey) {
     keyActionMap[newKey] = action;
-    apl((int)action);
-    apl((int)newKey);
+    // apl((int)action);
+    // apl((int)newKey);
 }
 
 void InputHandler::rebindMouseButton(Action action, int newKey) {
     mouseActionMap[newKey] = action;
-    apl((int)action);
-    apl((int)newKey);
+    // apl((int)action);
+    // apl((int)newKey);
 }
 
 void InputHandler::updateMousePosition(double xpos, double ypos) {
@@ -55,12 +55,12 @@ void InputHandler::updateMousePosition(double xpos, double ypos) {
 
 void InputHandler::rebindGamepadButton(Action action, int newButton) {
     buttonActionMap[newButton] = action;
-    apl(newButton);
+    // apl(newButton);
 }
 
 void InputHandler::setActionCallback(Action action, const std::function<void(Action)>& callback) {
     actionCallbackMap[action] = callback;
-    apl(int(action));
+    // apl(int(action));
 }
 
 

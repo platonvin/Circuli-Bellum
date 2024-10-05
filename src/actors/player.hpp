@@ -10,11 +10,11 @@ public:
     Actor actor;
 
     Player() : actor(ActorType::Player, b2_dynamicBody, Circle, 
-            twpp::pink(700), vec2(0), {.CIRCLE_radius = float(1.0)}) {}
+            twpp::pink(500), vec2(0), {.CIRCLE_radius = float(1.0)}) {}
 
     Player(float mass, float radius) : 
         actor(ActorType::Player, b2_dynamicBody, Circle, 
-            twpp::pink(700), vec2(0), {.CIRCLE_radius = float(radius)}),
+            twpp::pink(600), vec2(0), {.CIRCLE_radius = float(radius)}),
         props{.mass=mass, .radius=radius} {}
     
     //updates on local data, no contact with outside classes
@@ -24,19 +24,26 @@ public:
     void addToWorld(PhysicalWorld* world);
     Shape constructShape();
     void draw(VisualView* view);
+    void drawBody(VisualView* view);
+    void drawLegs(VisualView* view);
+    void drawArmsAndGun(VisualView* view);
+    void drawAmmo(VisualView* view);
 
     void drawCard(Card card);
 
     //potentially makes it much harder to optimize, but still
-    // const std::function<void()> tester = [this]() -> void {
-    //     pl(this);
-    // };
-    // void processBulletHit(Projectile)
     void processBulletHit(PhysicalWorld* world, ProjectileState* projectile);
 
     struct PlayerState state = {};
     struct PlayerProps props = {};
     vector<Card> cards;
+
+    //smooth movement. TODO: move to b2 & make bullet collider via bitset
+    vec2 visual_pos = vec2(0);
+    vec2 visual_vel = vec2(0);
+    float springConstant = 600.0f;
+    float dampingFactor = 20.0f; 
+    void updateVisualPos(float dTime);
 private:
     void softLimitVelocity(PhysicalWorld* world);
     void refillJumpsIfNeeded();
