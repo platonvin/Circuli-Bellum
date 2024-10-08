@@ -27,15 +27,22 @@ bool Projectile::processSceneryHit(SceneryState* scenery){
     }
 }
 
-void Projectile::addToWorld(PhysicalWorld* world){
+//same group always collides if group > 0 and never collides if group < 0
+void Projectile::addToWorld(PhysicalWorld* world, int group){
     //TODO capsule
     b2Circle bullet_circle = {};
         bullet_circle.radius = props.radius;
+    b2Filter bulletFilter = {};
+        bulletFilter.categoryBits = to_underlying(ActorType::Projectile);
+        bulletFilter.maskBits = to_underlying(ActorType::Projectile|ActorType::Player|ActorType::Scenery);
+        bulletFilter.groupIndex = group;
     b2ShapeDef bouncy_shape = b2DefaultShapeDef();
         bouncy_shape.restitution = props.bounciness;
         bouncy_shape.friction = 0;
+        bouncy_shape.filter = bulletFilter;
     b2BodyDef bullet_bdef = b2DefaultBodyDef();
         bullet_bdef.fixedRotation = true;
+
         // bouncy_shape.
     // world->addActor<b2Circle, b2CreateCircleShape>(&actor.bindings, &actor.state, &actor.properties, this, &bullet_circle,
     //     nullptr, &bouncy_shape);
@@ -97,8 +104,8 @@ void Projectile::drawTrail(VisualView* view) {
         // glm::vec2 rotation = glm::vec2(1, 0);
 
         // sizes are based on the segment index (first segment is wider, last is narrower)
-        float bottomHalfSize = props.radius * (1.0f - (float(i+1) / numSegments));
-        float topHalfSize = props.radius * ((1.0f - (float(i)) / numSegments));
+        float bottomHalfSize = props.radius * sqrt(( 1.0f - (float(i+1) / numSegments)));
+        float topHalfSize    = props.radius * sqrt(((1.0f - (float(i )) / numSegments)));
         float height = glm::length(direction);
 
         Shape shape = Shape();
@@ -120,16 +127,16 @@ void Projectile::drawTrail(VisualView* view) {
 void Projectile::setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor) {
     actor.state.pos = 
         ownerActor->state.pos +
-        ownerState->aim_direction * (props.radius + ownerProps->radius + 0.1f);
+        ownerState->aim_direction * (props.radius + ownerProps->player_radius + 0.1f);
     actor.state.vel = 
         ownerState->aim_direction * 
-        float(ownerProps->bullet_speed);
+        float(ownerProps->bullet_velocity);
         // actor.state.vel+=ownerActor->state.vel;
     state.radius = props.radius;
     state.damage = ownerState->damage;
     props.damage = ownerState->damage;
     actor.properties.color = ownerProps->bullet_color;
-    state.bounces_left = ownerProps->bullet_bounces;
+    state.bounces_left = ownerProps->bullet_bounce_count;
 
     //to not have a trail to (0,0)
     for(auto& op : oldPositions){

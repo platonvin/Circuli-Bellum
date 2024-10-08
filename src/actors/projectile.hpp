@@ -29,7 +29,7 @@ public:
     void update(PhysicalWorld* world /*for later?*/, float dTime);
     void updateTrailData();
     void drawTrail(VisualView* view);
-    void addToWorld(PhysicalWorld* world);
+    void addToWorld(PhysicalWorld* world, int group = 0);
     //return false if destroy
     bool processSceneryHit(SceneryState* scenery);
     bool processPlayerHit(PlayerState* player);

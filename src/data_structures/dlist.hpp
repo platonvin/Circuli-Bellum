@@ -8,6 +8,7 @@
 
 //TODO test arena (storage+free_idxs), fake ptrs. Arena to decrease alloc overhead
 
+//not-a-ponter to not have 1 more memory indirection. 
 template <class StoredClass>
 struct alignas(8) ListElem {
     //first for rtti

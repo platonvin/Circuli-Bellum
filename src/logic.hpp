@@ -48,7 +48,8 @@ public:
     List<Scenery> sceneries = {};
     List<Projectile> projectiles = {};
     vector<b2BodyId> body_garbage = {};
-    Player* controlled_player = 0;
+    //controlled_player
+    Player* slave = 0;
 
     void setup(int player_count = 1);
     void cleanup(void);
@@ -72,6 +73,7 @@ public:
     void removeAllScenery();
         
     void       addProjectile(Projectile projectile);
+    void       addProjectilesPack(Projectile projectile, int count, float vel_var);
     void    removeProjectile(ListElem<Projectile>* projectile);
     void removeAllProjectiles();
 
@@ -110,7 +112,8 @@ public:
         // std::cout << "A: " << touch.shapeIdA.index1 << " B: " << touch.shapeIdB.index1 << '\n';
         void* udataA = b2Shape_GetUserData(touch.shapeIdA);
         void* udataB = b2Shape_GetUserData(touch.shapeIdB);
-        assert(udataA && udataB);
+        // assert(udataA && udataB);
+        if(! (udataA && udataB)) return;
         ActorType typeA = ((Actor*)(udataA))->actorType;
         ActorType typeB = ((Actor*)(udataB))->actorType;
         caseProcessor(typeA, udataA, typeB, udataB); 
@@ -121,6 +124,7 @@ public:
     void processHitEvents(b2ContactEvents contacts);
     void processMoveEvents(b2BodyEvents moves, double dTime);
 
+    int countActivePlayers();
     // double getTime() {return glfwGetTime();}
 };
 

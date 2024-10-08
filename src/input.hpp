@@ -30,6 +30,7 @@ enum class Device : int{
     //TODO is it all?
 };
 
+
 //input obviously does not know game state, so this is purely key-press sugar
 enum class ActionType : int {
     //calls callback every update()
@@ -38,6 +39,10 @@ enum class ActionType : int {
     //calls calback once per press+release
     //used for opening menu's
     OneShot 
+    
+    //TODO: oneshot with extra OR
+    //start-end callbacks? short/long jump
+    //start / extra-after-specified-time?
 };
 
 //TODO should it be in here?

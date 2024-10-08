@@ -76,7 +76,7 @@ public:
     b2BodyEvents GetBodyEvents(void);
     b2ContactEvents GetContactEvents(void);
     b2SensorEvents GetSensorEvents(void);
-private:
+// private:
     b2WorldId world_id;
 };
 
@@ -108,15 +108,15 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
     } else {
         bodyDef = *bdef;
     }
-    apl(props->body_type)
-    bodyDef.type = props->body_type;
-    bodyDef.position = glm2b(state->pos);
-    bodyDef.linearVelocity = glm2b(state->vel);
-    bodyDef.isAwake = true;
-    bodyDef.isEnabled = true;
-    bodyDef.enableSleep = false;
-    bodyDef.sleepThreshold = 0;
-    bodyDef.automaticMass = true;
+    // apl(props->body_type)
+        bodyDef.type = props->body_type;
+        bodyDef.position = glm2b(state->pos);
+        bodyDef.linearVelocity = glm2b(state->vel);
+        bodyDef.isAwake = true;
+        bodyDef.isEnabled = true;
+        bodyDef.enableSleep = false;
+        bodyDef.sleepThreshold = 0;
+        bodyDef.automaticMass = true;
 
     assert(bind);
     // pl(bind->body.index1)
@@ -140,10 +140,10 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
 
     }
     assert(b2Body_IsValid(bind->body));
-    pl(bind->body.index1)
-    pl(bind->shape.index1)
+    // pl(bind->body.index1)
+    // pl(bind->shape.index1)
     // assert(b2Shape_IsValid(bind->shape));
-    assert(user_data);
+    // assert(user_data);
     b2Body_SetUserData(bind->body, user_data);
     b2Shape_SetUserData(bind->shape, user_data);
 }

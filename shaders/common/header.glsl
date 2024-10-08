@@ -20,6 +20,7 @@ const int SHAPE_SQUARE = 1;
 const int SHAPE_CAPSULE = 2;
 const int SHAPE_TRAPEZOID = 3;
 
+//TODO: dynamic pixel dependend
 const float SOFT_EDGE_RADIUS = 0.02;
 
 //sdf means "signed distance field"
@@ -65,20 +66,22 @@ float sdf_trapezoid_2(vec2 position, float bottom_hw, float top_hw, float half_h
 float getAlphaFromShape() {
     float shape_distance = 0.0;
 
-    float param_1 = value_1;
-    float param_2 = value_2;
-    float param_3 = value_3;
+    float param_1 = abs(value_1);
+    float param_2 = abs(value_2);
+    float param_3 = abs(value_3);
+
+    float sdf_radius = abs(extra_sdf_radius);
     
     switch (shape_type) {
         case SHAPE_CIRCLE:
             shape_distance = sdf_circle(local_pos, param_1);
             break;
         case SHAPE_SQUARE:
-            param_1 -= extra_sdf_radius;
-            param_2 -= extra_sdf_radius;
-            param_3 -= extra_sdf_radius;
+            param_1 -= sdf_radius;
+            param_2 -= sdf_radius;
+            param_3 -= sdf_radius;
             shape_distance = sdf_square(local_pos, vec2(param_1, param_2));
-            shape_distance -= extra_sdf_radius;
+            shape_distance -= sdf_radius;
             break;
         case SHAPE_CAPSULE:
             shape_distance = sdf_capsule(local_pos, param_1, param_2);

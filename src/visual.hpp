@@ -14,7 +14,7 @@ typedef struct Camera {
 
 enum ShapeType : unsigned char{
     Circle,
-    Square,
+    Rectangle,
     Capsule,
     Trapezoid,
 };
@@ -35,8 +35,8 @@ typedef union ShapeProps {
         float CIRCLE_radius;
     };
     struct{
-        float SQUARE_half_width;
-        float SQUARE_half_height;
+        float RECTANGLE_half_width;
+        float RECTANGLE_half_height;
     };
     struct{
         float CAPSULE_radius;

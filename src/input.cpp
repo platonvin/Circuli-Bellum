@@ -32,7 +32,7 @@ InputHandler::InputHandler() {
     actionTypeMap[Action::Menu] = ActionType::OneShot;
     actionTypeMap[Action::Confirm] = ActionType::OneShot;
     actionTypeMap[Action::Block] = ActionType::OneShot;
-    actionTypeMap[Action::Shoot] = ActionType::OneShot;
+    actionTypeMap[Action::Shoot] = ActionType::Continuous;
     actionTypeMap[Action::DrawRNDcard] = ActionType::OneShot;
 }
 

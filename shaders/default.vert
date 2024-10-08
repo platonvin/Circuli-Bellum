@@ -38,26 +38,30 @@ const float SIZE_ADDER = 0.02;
 vec2 get_shape_shift() {
     vec2 shift;
     
+    // float param_1 = abs(value_1);
+    // float param_2 = abs(value_2);
+    // float param_3 = abs(value_3);
+
     switch (shape_type){
         case (Circle): {
             // value_1 is radius
             shift = vec2(value_1);
             // shift *= SIZE_MULTIPLIER; //padding for smooth edges
-            shift += SIZE_ADDER; //padding for smooth edges
+            shift += sign(value_1)*SIZE_ADDER; //padding for smooth edges
             break;
         }
         case (Square): {
             // value_1 is width/2,  value_2 is height/2
             shift = vec2(value_1, value_2); // Bounding box extends half the width/height from center
             // shift *= SIZE_MULTIPLIER; //padding for smooth edges
-            shift += SIZE_ADDER; //padding for smooth edges
+            shift += vec2(sign(value_1),sign(value_2))*SIZE_ADDER; //padding for smooth edges
             break;
         }
         case (Capsule): {
             // value_1 is radius, value_2 is length/2
             shift = vec2(value_2 + value_1, value_1); // Horizontal length + radius at both ends
             // shift *= SIZE_MULTIPLIER;
-            shift += SIZE_ADDER; //padding for smooth edges
+            shift += vec2(sign(value_2),sign(value_1))*SIZE_ADDER; //padding for smooth edges
             break;
         }
         case (Trapezoid): {
@@ -74,7 +78,7 @@ vec2 get_shape_shift() {
             shift.y = +value_3;
             //TODO:
             // shift *= SIZE_MULTIPLIER;
-            shift += SIZE_ADDER; //padding for smooth edges
+            shift += vec2(sign(value_2),sign(value_3))*SIZE_ADDER; //padding for smooth edges
             break;
         }
     }
