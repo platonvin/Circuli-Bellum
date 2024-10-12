@@ -1,18 +1,17 @@
 #pragma once
-#ifndef DLIST_HPP
-#define DLIST_HPP
-#include <unordered_set>
+#ifndef __DLIST_HPP__
+#define __DLIST_HPP__
+// #include <unordered_set>
+#include "arena.hpp"
 
 #include <cassert>
 #include <iostream>
-
-//TODO test arena (storage+free_idxs), fake ptrs. Arena to decrease alloc overhead
 
 //not-a-ponter to not have 1 more memory indirection. 
 template <class StoredClass>
 struct alignas(8) ListElem {
     //first for rtti
-    StoredClass storage;
+    StoredClass storage = {};
     ListElem* next = nullptr;
     ListElem* prev = nullptr;
 
@@ -31,9 +30,14 @@ public:
 
     ListElemType* _start = nullptr;
     ListElemType* _end = nullptr;
+    Arena<ListElemType> arena;
 
-    std::unordered_set<ListElem<Type>*> garbage; 
+    ankerl::unordered_dense::set<ListElem<Type>*> garbage; 
+    // std::unordered_set<ListElem<Type>*> garbage; 
     // List itself isn't malloced
+    List(int _size) : arena(_size){
+
+    }
     ~List() {
         removeAll();
     }
@@ -42,21 +46,22 @@ public:
         ListElemType* current = _start;
         while (current) {
             ListElemType* nextElem = current->next;
-            delete current;
+            arena.free((ListElemType*)current);
             current = nextElem;
         }
         _start = _end = nullptr;
     }
 
     void removeElem(ListElemType* elem_ptr) {
-        assert(elem_ptr);
-        bool found = false;
-        ListElemType* current = _start;
-        while (current) {
-            ListElemType* nextElem = current->next;
-            if(current == elem_ptr) found=true;
-            current = nextElem;
-        } assert (found);
+        // validation. Slow.
+        // assert(elem_ptr);
+        // bool found = false;
+        // ListElemType* current = _start;
+        // while (current) {
+        //     ListElemType* nextElem = current->next;
+        //     if(current == elem_ptr) found=true;
+        //     current = nextElem;
+        // } assert (found);
         
         // assuming elem_ptr is perfectly valid
         if (elem_ptr->prev) {
@@ -71,7 +76,7 @@ public:
             _end = elem_ptr->prev;
         }
 
-        delete elem_ptr;
+        arena.free((ListElemType*)elem_ptr);
     }
 
     //GC
@@ -100,7 +105,8 @@ public:
 
 
     ListElemType* insertAfter(ListElemType* elem_ptr, const Type& class_obj) {
-        ListElemType* newElem = new ListElemType(class_obj);
+        ListElemType* newElem = arena.allocate();
+        *newElem = ListElemType(class_obj);
         newElem->next = elem_ptr->next;
         newElem->prev = elem_ptr;
 
@@ -115,7 +121,8 @@ public:
     }
 
     ListElemType* insertBefore(ListElemType* elem_ptr, const Type& class_obj) {
-        ListElemType* newElem = new ListElemType(class_obj);
+        ListElemType* newElem = arena.allocate();
+        *newElem = ListElemType(class_obj);
         newElem->next = elem_ptr;
         newElem->prev = elem_ptr->prev;
 
@@ -135,7 +142,8 @@ public:
     }
 
     ListElemType* appendBack(const Type& class_obj) {
-        ListElemType* newElem = new ListElemType(class_obj);
+        ListElemType* newElem = arena.allocate();
+        *newElem = ListElemType(class_obj);
         if (!_end) {
             _start = _end = newElem;
         } else {
@@ -147,7 +155,8 @@ public:
     }
 
     ListElemType* appendFront(const Type& class_obj) {
-        ListElemType* newElem = new ListElemType(class_obj);
+        ListElemType* newElem = arena.allocate();
+        *newElem = ListElemType(class_obj);
         if (!_start) {
             _start = _end = newElem;
         } else {
@@ -240,4 +249,4 @@ public:
 };
 
 
-#endif // DLIST_HPP
+#endif // __DLIST_HPP__

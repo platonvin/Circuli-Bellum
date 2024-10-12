@@ -8,18 +8,6 @@ b2ContactEvents PhysicalWorld::GetContactEvents(void) {return b2World_GetContact
 b2SensorEvents PhysicalWorld::GetSensorEvents(void) {return b2World_GetSensorEvents(world_id);}
 void PhysicalWorld::step(float dTime) {b2World_Step(world_id, dTime, 4);}
 
-// B2_API b2ShapeId b2CreateCircleShape( b2BodyId bodyId, const b2ShapeDef* def, const b2Circle* circle );
-// template 
-// void PhysicalWorld::addActor<typename b2type, >(PhysicalBindings* bind, PhysicalState* state, PhysicalProperties* props, void* user_data, void* fn) {
-
-    // b2BodyDef bodyDef = b2DefaultBodyDef();
-    //     bodyDef.type = type;
-        
-    //     bodyDef.position = {x, y};
-    // // b2Hull hull = b2ComputeHull(vertices.data(), vertices.size());
-    // // assert(hull.count > 0);
-    // b2Polygon polyShape = b2MakeRoundedBox(float hx, float hy, float radius);
-
 void PhysicalWorld::applyForce(b2BodyId body, const b2Vec2& force) {
     b2Body_ApplyForceToCenter(body, force, true);
 }

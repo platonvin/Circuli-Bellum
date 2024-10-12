@@ -6,10 +6,7 @@
 #include "actor.hpp"
 // #include <functional>
 
-class Scenery;
-class Player;
-
-class Projectile {
+struct Projectile {
 public:
     //first for custom rtti :)
     Actor actor;
@@ -22,9 +19,9 @@ public:
         actor(ActorType::Projectile, b2_dynamicBody, Circle, \
             twpp::pink(700), vec2(0), {.CIRCLE_radius = radius}),
         state{.damage=damage, .radius=radius},
-        props{.damage=damage, .radius=radius} {}
+        props{.damage=float(damage), .radius=radius} {}
 
-    void setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor);
+    void setupFromPlayer(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor);
 
     void update(PhysicalWorld* world /*for later?*/, float dTime);
     void updateTrailData();
@@ -40,9 +37,30 @@ public:
     Shape constructShape();
     void draw(VisualView* view);
 
+
+    static const int NUM_SEGMENTS = 10;
+    static std::array<float, NUM_SEGMENTS> precomputedSizes;
+    // static initializer
+    static void initializePrecomputedSizes() {
+        for (int i = 0; i < NUM_SEGMENTS; i++) {
+            precomputedSizes[i] = sqrt(1.0f - (float(i) / NUM_SEGMENTS));
+        }
+    }
+
     //for a bullet trail
-    std::array<vec2, 10> oldPositions = {};
+    struct TrailSegment {
+        vec2 pos;
+        vec2 dir;
+        float angle;
+        float len;
+    };
+
+    // 0->1
+    // ...
+    // 8->9
+    // 9->None, this was the last one
+    std::array<TrailSegment, NUM_SEGMENTS> trailSegments = {};
+    //trail + others collision
     float time_elapsed = 0;
-    
 };
 #endif // __PROJECTILE_HPP__

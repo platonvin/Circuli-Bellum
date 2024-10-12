@@ -71,22 +71,35 @@ class VisualView{
 public:
     Renderer render = {};
     //TODO?
-    const int max_static_shape_count = 1 << 16;
-    const int max_dynamic_shape_count = 1 << 16;
+    //do not need a lot
+    const int max_shadow_shape_count = 1 << 10;
+    //do need a lot. TODO? estimate max
+    const int max_dynamic_shape_count = 1 << 18;
     // Created on level setup
-    std::array<vector<Shape>, COLORING_TYPE_SIZE> static_shape_vectors;
+    vector<Shape> shadow_shapes;
     // Resets every frame
     std::array<vector<Shape>, COLORING_TYPE_SIZE> dynamic_shape_vectors;
 
-    std::array<RasterPipe, COLORING_TYPE_SIZE> fillerPipes;
+    std::array<RasterPipe, COLORING_TYPE_SIZE> filler_pipes;
+
+    Shape background;
+    ColoringType background_ct;
 
     Camera camera = {};
+    struct {
+        vec2 pos; 
+        vec2 size; 
+        ivec2 res; 
+        vec2 chrom_abb;
+        vec2 light_pos;
+        float time;
+    } ubo_cpu;
 
     // Store a pair of RasterPipe and coloringType
     void setup ();
     void cleanup();
     void createImages();
-    void createSwapchainDependentImages();
+    // void createSwapchainDependentImages();
     // void cleanupSwapchainDependent();
     void setupDescriptors();
     void createPasses();
@@ -96,7 +109,7 @@ public:
     void createShapeBuffers();
     void createUniformBuffer();
 
-        void copyStaticShapesToGPU();
+        void copyShadowShapesToGPU();
         void copyDynamicShapesToGPU();
         // void sortStaticShapesByColoringType();
         // void sortDynamicShapesByColoringType();
@@ -104,19 +117,20 @@ public:
     void drawShapes();
     // sets voxels and size. By default uses first .vox palette as main palette
 
-    void reset_static_shapes();
-        void draw_static_shape(Shape, ColoringType);
+    void reset_shadow_shapes();
 
     void reset_dynamic_shapes();
     void start_frame();
         void start_main_pass();
+            void draw_background(Shape shape, ColoringType type);
+            void draw_shadow_shape(Shape);
             void draw_dynamic_shape(Shape, ColoringType);
         void end_main_pass();
         void mipmap_bloom();
         void bloom_pass();
     void end_frame();
 
-    ring<Buffer> staticShapeBuffer;
+    ring<Buffer> shadowShapeBuffer;
     ring<Buffer> dynamicShapeBuffer;
 
     //subpass of main
@@ -130,8 +144,12 @@ public:
     //for second pass
     RasterPipe bloomApplyPipe; // blends bloom with original
 
+    RasterPipe shadowPipe; // blends bloom with original
+    RasterPipe shadowApplyPipe; // blends bloom with original
+
     RenderPass mainPass; //draws everything and extracts bloom
     RenderPass bloomApplyPass;
+    RenderPass shadowPass; // 1d rasterizetion
     //TODO BLOOM
 
     ring<VkCommandBuffer> graphicsCommandBuffers;
@@ -141,22 +159,25 @@ public:
     ring<Image> bloomExtracted; // w,h;
     ring<Image> bloomMimapped; // w,h / 2 -> 1
     ring<Buffer> uniform;
+    ring<Image> shadowmap; // 1d texture for shadows from ONE source
 
   private:
     // const VkFormat FRAME_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
-    const VkFormat FRAME_FORMAT = VK_FORMAT_R16G16B16A16_UNORM;
-    const VkFormat BLOOM_FORMAT = VK_FORMAT_R16G16B16A16_UNORM;
+    const VkFormat  FRAME_FORMAT = VK_FORMAT_R16G16B16A16_UNORM;
+    const VkFormat  BLOOM_FORMAT = VK_FORMAT_R16G16B16A16_UNORM;
+    const VkFormat SHADOW_FORMAT = VK_FORMAT_D32_SFLOAT; //TODO:
+    const u32 SHADOWMAP_SIZE = 1024*16;
     VkSampler linearSampler;
     VkSampler nearestSampler;
 
     std::function<VkResult(void)> createSwapchainDependent = [this](){
         graphicsCommandBuffers = {};
         copyCommandBuffers = {};
-        for(mut frp : fillerPipes){
+        for(mut frp : filler_pipes){
             frp = {};
             l();
         }
-        
+
         render.createCommandBuffers(&graphicsCommandBuffers, render.settings.fif);
         render.createCommandBuffers(&copyCommandBuffers, render.settings.fif);
 
@@ -176,14 +197,26 @@ public:
     std::function<VkResult(void)> cleanupSwapchainDependent = [this](){
         render.deviceWaitIdle();
         
-        // render.deleteImages(&frame);
-        render.deleteImages(&bloomMimapped);
-        
+        render.deleteImages(&frame);
+        render.deleteImages(&shadowmap);
+        render.deleteImages(&bloomExtracted); // w,h;
+        render.deleteImages(&bloomMimapped); // w,h / 2 -> 1
+
         render.destroyRenderPass(&mainPass);
-        for(mut frp : fillerPipes){
+        render.destroyRenderPass(&bloomApplyPass);
+        render.destroyRenderPass(&shadowPass);
+
+        for(mut frp : filler_pipes){
             render.destroyRasterPipeline(&frp);
         }
+        render.destroyRasterPipeline(&bloomApplyPipe);
+        render.destroyRasterPipeline(&shadowPipe);
+        render.destroyRasterPipeline(&bloomExtractPipe);
+        render.destroyComputePipeline(&bloomDownsamplePipe);
+        render.destroyComputePipeline(&bloomUpsamplePipe);
         // render.destroyRasterPipeline(&bloomPipe);
+        vkDestroyDescriptorSetLayout(render.device, bloomDownsamplePushLayout, NULL);
+        vkDestroyDescriptorSetLayout(render.device, bloomUpsamplePushLayout, NULL);
         return VK_SUCCESS;
     };
 };

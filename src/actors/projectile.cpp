@@ -19,6 +19,7 @@ bool Projectile::processSceneryHit(SceneryState* scenery){
     if(state.bounces_left > 0){
         //bounce
         state.bounces_left--;
+        state.damage += props.damage * props.extra_damage_per_bounce; 
         return true;
     }
     else {
@@ -34,7 +35,7 @@ void Projectile::addToWorld(PhysicalWorld* world, int group){
         bullet_circle.radius = props.radius;
     b2Filter bulletFilter = {};
         bulletFilter.categoryBits = to_underlying(ActorType::Projectile);
-        bulletFilter.maskBits = to_underlying(ActorType::Projectile|ActorType::Player|ActorType::Scenery);
+        bulletFilter.maskBits = to_underlying(ActorType::Projectile|ActorType::Player|ActorType::StaticScenery|ActorType::DynamicScenery|ActorType::Border);
         bulletFilter.groupIndex = group;
     b2ShapeDef bouncy_shape = b2DefaultShapeDef();
         bouncy_shape.restitution = props.bounciness;
@@ -55,19 +56,34 @@ Shape Projectile::constructShape(){
     Shape shape = actor.constructActorShape();
         shape.shapeType = Circle;
         //overwrites
-        shape.props.CIRCLE_radius = props.radius;
+        shape.props.CIRCLE_radius = state.radius;
     return shape;
 }
 
 void Projectile::updateTrailData() {
-    oldPositions[0] = actor.state.pos;
+    // update 0'st segment
+    trailSegments[0].pos = actor.state.pos;
+    vec2 diff = trailSegments[0].pos - trailSegments[1].pos;
+    trailSegments[0].len = length(diff);
+    trailSegments[0].dir = normalize(diff);
+    //TODO? diff?
+    trailSegments[0].angle = atan2(trailSegments[0].dir.x, trailSegments[0].dir.y);
+    
     // Shift old positions down
-    for (int i = oldPositions.size() - 1; i > 0; i--) {
-        oldPositions[i] = oldPositions[i - 1];
+    for (int i = trailSegments.size() - 1; i > 0; i--) {
+        trailSegments[i] = trailSegments[i - 1];
     }
 }
 
 void Projectile::update(PhysicalWorld* world, float dTime){
+    // scaling for Grow
+    if(props.grow_factor != 0){
+        state.damage *= exp(dTime*props.grow_factor);
+        state.radius *= exp(dTime*props.grow_factor);
+        auto prev = b2Shape_GetCircle(actor.bindings.shape);
+        prev.radius = state.radius;
+        b2Shape_SetCircle(actor.bindings.shape, &prev);
+    }
     time_elapsed += dTime;
     const float TIME_BETWEEN_TRAIL_UPDATES = 0.01;
     if(time_elapsed > TIME_BETWEEN_TRAIL_UPDATES){
@@ -81,65 +97,56 @@ void Projectile::draw(VisualView* view){
     drawTrail(view);
 }
 
-// actually, not really that precise
-// leaves gaps
-// TODO?
+// actually, not really that precise - leaves gaps
 void Projectile::drawTrail(VisualView* view) {
-    float numSegments = oldPositions.size();
-    glm::vec2 newPos = actor.state.pos;
+    int numSegments = trailSegments.size();
 
-    for (int i = 0; i < oldPositions.size(); i++) {
-        glm::vec2 prevPos = oldPositions[i];
+    // segments are somewhat cached
+    // (atan+normalize+length were the bottlneck)
+    for (int i = 1; i < numSegments; i++) {
+        TrailSegment prevSeg = trailSegments[i-1];
+        TrailSegment  curSeg = trailSegments[i];
 
         // skip trail segments for stationary points (no movement)
-        if (newPos == prevPos) continue;
+        // if (prevSeg.pos == curSeg.pos) continue;
 
-        glm::vec2 direction = newPos - prevPos;
-        glm::vec2 dirNorm = glm::normalize(direction);
-        // if (glm::length(direction) < 0.01f) continue;
-
-        float angle = atan2(dirNorm.x, dirNorm.y);
-        // glm::vec2 rotation = glm::vec2(cos(angle), sin(angle));
-        // glm::vec2 rotation = glm::vec2(sin(angle), cos(angle));
-        // glm::vec2 rotation = glm::vec2(1, 0);
-
-        // sizes are based on the segment index (first segment is wider, last is narrower)
-        float bottomHalfSize = props.radius * sqrt(( 1.0f - (float(i+1) / numSegments)));
-        float topHalfSize    = props.radius * sqrt(((1.0f - (float(i )) / numSegments)));
-        float height = glm::length(direction);
+        float bottomHalfSize = state.radius * sqrt(( 1.0f - (float(i+1) / float(numSegments))));
+        float topHalfSize    = state.radius * sqrt(((1.0f - (float(i)) / float(numSegments))));
 
         Shape shape = Shape();
             shape.coloring_info = actor.properties.color;
-            shape.pos = (prevPos + newPos) / 2.f;
-            shape.rot_angle = angle; //set negative to get unique debugging experience
+            shape.pos = (prevSeg.pos + curSeg.pos) / 2.f;
+            shape.rot_angle = prevSeg.angle; //set negative to get unique debugging experience
             shape.shapeType = Trapezoid;
             shape.props.TRAPEZOID_half_bottom_size = bottomHalfSize;
             shape.props.TRAPEZOID_half_top_size = topHalfSize;
-            shape.props.TRAPEZOID_half_height = height / 2.0f;   
-
+            shape.props.TRAPEZOID_half_height = prevSeg.len / 2.0f;   
         view->draw_dynamic_shape(shape, SolidColor);
-
-        // Move to the next segment
-        newPos = prevPos;
     }
 }
 
-void Projectile::setup(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor) {
+void Projectile::setupFromPlayer(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor) {
+    props.damage = ownerProps->bullet_damage;
+    props.extra_damage_per_bounce = ownerProps->extra_damage_per_bounce;
+    props.bounciness = .9;
+    props.radius = ownerProps->bullet_radius;
+    props.grow_factor = ownerProps->grow_factor;
+
     actor.state.pos = 
         ownerActor->state.pos +
-        ownerState->aim_direction * (props.radius + ownerProps->player_radius + 0.1f);
+        ownerState->aim_direction * (props.radius + ownerProps->radius + 0.1f);
     actor.state.vel = 
         ownerState->aim_direction * 
-        float(ownerProps->bullet_velocity);
+        float(ownerProps->bullet_speed);
         // actor.state.vel+=ownerActor->state.vel;
     state.radius = props.radius;
     state.damage = ownerState->damage;
     props.damage = ownerState->damage;
     actor.properties.color = ownerProps->bullet_color;
-    state.bounces_left = ownerProps->bullet_bounce_count;
+    state.bounces_left = ownerProps->bullet_bounces;
 
     //to not have a trail to (0,0)
-    for(auto& op : oldPositions){
-        op = actor.state.pos;
+    for(auto& seg : trailSegments){
+        seg.pos = actor.state.pos;
     }
 }

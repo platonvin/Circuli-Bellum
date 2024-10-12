@@ -4,3 +4,5 @@
  - no useless functions (return m_var)
  - TODO:? zero as valid value for malloc/memset
  - alloca()? 
+ - use #pragma once
+ - vec4 > vec3? TODO: test

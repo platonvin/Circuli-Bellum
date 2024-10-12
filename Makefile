@@ -2,7 +2,7 @@
 
 #setting up include and lib directories for dependencies
 I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include -Itw-colors-cpp
-L = -Llum-al/lib -Lbox2d/build/src/
+L = -Llum-al/lib -Lbox2d/lib
 
 CPP_COMPILER = g++
 # CPP_COMPILER = clang++
@@ -17,11 +17,11 @@ else
 endif
 
 always_enabled_flags = -fno-exceptions -std=c++20
-debug_flags   = -O0 -g 
+debug_flags   = -O0 -g $(always_enabled_flags)
 # TODO -fsanitize=undefined
-release_flags = -Os -mmmx -msse4 -mpclmul -s -flto
-
-crazy_flags   = -flto -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8 -D_GLIBCXX_PARALLEL -funroll-loops -w $(release_flags)
+release_flags = -Os -mmmx -msse4 -mpclmul $(always_enabled_flags)
+crazy_flags   = -O3 -flto -s -march=native -fopenmp -floop-parallelize-all -ftree-parallelize-loops=8 -D_GLIBCXX_PARALLEL -funroll-loops -w $(always_enabled_flags)
+profile_flags = -no-pie -g -pg
 
 SHADER_FLAGS = --target-env=vulkan1.1 -g -O
 
@@ -31,6 +31,7 @@ srcs := \
 	src/visual.cpp\
 	src/logic.cpp\
 	src/input.cpp\
+	src/actors/actor.cpp\
 	src/actors/player.cpp\
 	src/actors/projectile.cpp\
 	src/actors/scenery.cpp\
@@ -72,8 +73,12 @@ DEPS = $(deb_objs:.o=.d)
 SHADER_SRC_DIR = shaders
 SHADER_OUT_DIR = shaders/compiled
 SHADERS_EXTRA_DEPEND = \
-	shaders/common/header.glsl\
 	shaders/common/colors.glsl\
+	shaders/common/default_vertex.glsl\
+	shaders/common/header.glsl\
+	shaders/common/map_shadow.glsl\
+	shaders/common/sdf_functions.glsl\
+	shaders/common/ubo.glsl\
 	shaders/noise/fbm.glsl\
 	shaders/noise/perlin.glsl\
 
@@ -94,7 +99,10 @@ ifeq ($(OS),Windows_NT)
 else
 	./client_deb
 endif
-	
+
+profile: args := $(profile_flags)
+profile: release
+
 release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_rel 
 ifeq ($(OS),Windows_NT)
 	.\client_rel
@@ -102,7 +110,15 @@ else
 	./client_rel
 endif
 
-
+crazy: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_crz 
+ifeq ($(OS),Windows_NT)
+	.\client_crz
+else
+	./client_crz
+endif
+# .PHONY: lumal 
+lumal: lum-al/lib/liblumal.a
+# .PHONY: lum-al/lib/liblumal.a
 lum-al/lib/liblumal.a: vcpkg_installed
 	git submodule init
 	git submodule update
@@ -113,19 +129,15 @@ lum-al/lib/liblumal.a: vcpkg_installed
 #mostly for testing
 only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(rel_objs) build_rel
 
-#crazy fast
-crazy: init vcpkg_installed_eval shaders
-	$(CPP_COMPILER) $(srcs) -o crazy_client $(crazy_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
-crazy_native: init vcpkg_installed_eval shaders
-	$(CPP_COMPILER) $(srcs) -o crazy_client $(crazy_flags) -march=native $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
-
 #i could not make it work without this
 build_deb: setup $(deb_objs)
-	$(CPP_COMPILER) -o client_deb $(deb_objs) $(debug_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) -o client_deb $(deb_objs) $(debug_flags) $(args) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 # strip .\client_deb.exe
 build_rel: setup $(rel_objs) 
-	$(CPP_COMPILER) -o client_rel $(rel_objs) $(release_flags) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
+	$(CPP_COMPILER) -o client_rel $(rel_objs) $(release_flags) $(args) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 # strip .\client_rel.exe
+build_crz: setup 
+	$(CPP_COMPILER) -o client_crz $(srcs) $(crazy_flags) $(args) $(I) $(L) $(REQUIRED_LIBS) $(STATIC_OR_DYNAMIC)
 
 fun:
 	@echo -e '\033[0;36m' fun was never an option '\033[0m'

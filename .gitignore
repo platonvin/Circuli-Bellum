@@ -17,3 +17,11 @@ client_deb
 /todo.txt
 /box2d.txt
 /temp.txt
+/a*.txt
+/client_crz.exe
+/gmon.out
+/imgui.ini
+/box2d/lib
+/box2d/obj
+/todo.md
+/how i render ROUNDS.txt

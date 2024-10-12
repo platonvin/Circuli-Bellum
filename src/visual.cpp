@@ -43,13 +43,16 @@ void VisualView::cleanup(void) {
     render.deviceWaitIdle();
     cleanupSwapchainDependent();
     render.deleteBuffers(&uniform);
-    render.deleteBuffers(&staticShapeBuffer);
+    render.deleteBuffers(&shadowShapeBuffer);
     render.deleteBuffers(&dynamicShapeBuffer);
+    render.destroySampler(linearSampler);
+    render.destroySampler(nearestSampler);
     render.cleanup();
 }
 
 void VisualView::setupDescriptors(void) {
-    for (mut fillerPipe : fillerPipes) {
+    for (mut fillerPipe : filler_pipes) {
+        fillerPipe = {};
         render.descriptorBuilder
             .setLayout(&fillerPipe.setLayout)
             .setDescriptorSets(&fillerPipe.sets)
@@ -59,12 +62,25 @@ void VisualView::setupDescriptors(void) {
             .defer();
     }
 
+    bloomApplyPipe = {};
+    shadowApplyPipe = {};
+    shadowPipe = {};
+    bloomExtractPipe = {};
+    bloomUpsamplePipe = {};
+    bloomDownsamplePipe = {};
     render.descriptorBuilder
         .setLayout(&bloomApplyPipe.setLayout).setDescriptorSets(&bloomApplyPipe.sets)
         .setDescriptions({
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RD_CURRENT, &uniform, {/*empty*/}, NO_SAMPLER, NO_LAYOUT, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT},
-            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, RD_CURRENT, {/*empty*/}, &frame, NO_SAMPLER, VK_IMAGE_LAYOUT_GENERAL, VK_SHADER_STAGE_FRAGMENT_BIT},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RD_CURRENT, {/*empty*/}, &bloomExtracted, nearestSampler, VK_IMAGE_LAYOUT_GENERAL, VK_SHADER_STAGE_FRAGMENT_BIT},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RD_CURRENT, {/*empty*/}, &frame, linearSampler, VK_IMAGE_LAYOUT_GENERAL, VK_SHADER_STAGE_FRAGMENT_BIT},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RD_CURRENT, {/*empty*/}, &bloomExtracted, linearSampler, VK_IMAGE_LAYOUT_GENERAL, VK_SHADER_STAGE_FRAGMENT_BIT},
+        })
+        .defer();
+    render.descriptorBuilder
+        .setLayout(&shadowApplyPipe.setLayout).setDescriptorSets(&shadowApplyPipe.sets)
+        .setDescriptions({
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RD_CURRENT, &uniform, {/*empty*/}, NO_SAMPLER, NO_LAYOUT, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RD_CURRENT, {/*empty*/}, &shadowmap, linearSampler, VK_IMAGE_LAYOUT_GENERAL, VK_SHADER_STAGE_FRAGMENT_BIT},
         })
         .defer();
     render.descriptorBuilder
@@ -98,6 +114,12 @@ void VisualView::setupDescriptors(void) {
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RD_CURRENT, &uniform, {/*empty*/}, NO_SAMPLER, NO_LAYOUT, VK_SHADER_STAGE_COMPUTE_BIT},
         })
         .defer();
+    render.descriptorBuilder
+        .setLayout(&shadowPipe.setLayout).setDescriptorSets(&shadowPipe.sets)
+        .setDescriptions({
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RD_CURRENT, &uniform, {/*empty*/}, NO_SAMPLER, NO_LAYOUT, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT},
+        })
+        .defer();
     // for(int mip=0; mip<bloomMimapped.current().mip_views.size(); mip++){
     // }
 
@@ -107,7 +129,7 @@ void VisualView::setupDescriptors(void) {
 void VisualView::createImages(void) {
     render.createImageStorages(&frame,
         VK_IMAGE_TYPE_2D, FRAME_FORMAT,
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
@@ -117,31 +139,45 @@ void VisualView::createImages(void) {
         log2(glm::max(render.swapChainExtent.width/2, render.swapChainExtent.height/2))+1;// - log2(40) + 1;
     render.createImageStorages(&bloomExtracted,
         VK_IMAGE_TYPE_2D, BLOOM_FORMAT,
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         {render.swapChainExtent.width, render.swapChainExtent.height,1}, u32(1));
     render.createImageStorages(&bloomMimapped,
         VK_IMAGE_TYPE_2D, BLOOM_FORMAT,
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         {render.swapChainExtent.width/2, render.swapChainExtent.height/2,1}, u32(mips));
-    // render.transitionImageLayoutSingletime(&bloomMimapped[0], VK_IMAGE_LAYOUT_GENERAL, 9);
+    
+    render.createImageStorages(&shadowmap,
+        VK_IMAGE_TYPE_1D, SHADOW_FORMAT,
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        {SHADOWMAP_SIZE, 1,1}, 1);
 }
 
 void VisualView::createPasses(void) {
+    mainPass = {};
+    bloomApplyPass = {}; 
+    shadowPass = {}; 
+
     vector<RasterPipe*> pipes = {};
-    for(mut pipe: fillerPipes){
+    for(mut pipe: filler_pipes){
         pipes.push_back(&pipe);
     }
+    //drawn is same spass to be between background and scenery
+    pipes.push_back(&shadowApplyPipe);
     render.renderPassBuilder.setAttachments({
             {&frame,          Clear,Store, DontCare,DontCare, {.color= {.float32={0,0,0,1}}}, VK_IMAGE_LAYOUT_GENERAL},
             {&bloomExtracted, Clear,Store, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
         }).setSubpasses({
             {pipes, {}, {&frame}, {}},
+            // {{}, {}, {&frame}, {}},
             {{&bloomExtractPipe}, {&frame}, {&bloomExtracted}, {}},
         })
         .build(&mainPass);
@@ -149,12 +185,21 @@ void VisualView::createPasses(void) {
     //produces final swapchain image
     render.renderPassBuilder.setAttachments({
             {&render.swapchainImages, Clear,Store, DontCare,DontCare, {.color= {.float32={0,0,0,1}}}, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
-            {&frame,           Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
-            {&bloomExtracted,  Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
+            // {&frame,           Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
+            // {&bloomExtracted,  Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
         }).setSubpasses({
-            {{&bloomApplyPipe}, {&frame, &bloomExtracted}, {&render.swapchainImages}, {}},
+            {{&bloomApplyPipe}, {}, {&render.swapchainImages}, {}},
         })
         .build(&bloomApplyPass);
+    
+    render.renderPassBuilder.setAttachments({
+            {&shadowmap, Clear,Store, Clear,Store, {.depthStencil= {.depth=1.0}}, VK_IMAGE_LAYOUT_GENERAL},
+            // {&frame,           Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
+            // {&bloomExtracted,  Load,DontCare, DontCare,DontCare, {.color= {.float32={0,0,0,0}}}, VK_IMAGE_LAYOUT_GENERAL},
+        }).setSubpasses({
+            {{&shadowPipe}, {}, {}, &shadowmap},
+        })
+        .build(&shadowPass);
 }
 
 void VisualView::createPipes(void) {
@@ -174,14 +219,42 @@ void VisualView::createPipes(void) {
         })
         .setAttributes({}).setCreateFlags(0).setStride(0)
         .setExtent(render.swapChainExtent)
-        .setBlends({BLEND_MIX})
+        .setBlends({BLEND_MIX}).setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .buildRaster(&bloomApplyPipe);
+    render.pipeBuilder.setStages({
+            {"shaders/compiled/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
+            {"shaders/compiled/shadows_apply.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
+        })
+        .setAttributes({}).setCreateFlags(0).setStride(0)
+        .setExtent(render.swapChainExtent)
+        .setBlends({BLEND_MIX}).setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+        .buildRaster(&shadowApplyPipe);
+
+    render.pipeBuilder.setStages({
+            {"shaders/compiled/shadows.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
+            {"shaders/compiled/shadows.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
+        }).setAttributes({
+                {VK_FORMAT_R8G8B8_UINT, offsetof (Shape, coloring_info)},
+                {VK_FORMAT_R8_UINT, offsetof (Shape, shapeType)},
+                {VK_FORMAT_R32G32_SFLOAT, offsetof (Shape, pos)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, rot_angle)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, rounding_radius)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_1)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_2)},
+                {VK_FORMAT_R32_SFLOAT, offsetof (Shape, props.value_3)},
+            }).setStride(sizeof(Shape)).setPushConstantSize(0)
+        .setExtent({SHADOWMAP_SIZE,1})
+        .setDepthTesting(DEPTH_TEST_READ_BIT|DEPTH_TEST_WRITE_BIT)
+        .setDepthCompareOp(VK_COMPARE_OP_LESS)
+        .setBlends({NO_BLEND}).setTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
+        .buildRaster(&shadowPipe);
+
     render.pipeBuilder.setStages({
             {"shaders/compiled/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
             {"shaders/compiled/bloom_extract.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT}
         })
         .setExtent(render.swapChainExtent)
-        .setBlends({NO_BLEND})
+        .setBlends({NO_BLEND}).setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .buildRaster(&bloomExtractPipe);
 
     // render.pipeBuilder.setStages({
@@ -221,18 +294,15 @@ void VisualView::createSamplers(void) {
 void VisualView::start_frame(void) {
     render.start_frame({graphicsCommandBuffers.current()});
     updateUniformBuffers();
-}
-
-void VisualView::start_main_pass(void) {
-    render.cmdBeginRenderPass(graphicsCommandBuffers.current(), &mainPass);
+    reset_shadow_shapes();
     reset_dynamic_shapes();
 }
 
-void VisualView::reset_static_shapes(void){
-    // Map itself is untouched
-    // Vectors that store "drawn" shapes are cleared 
-    for(mut shapes : static_shape_vectors){
-        shapes.clear();}
+void VisualView::start_main_pass(void) {
+}
+
+void VisualView::reset_shadow_shapes(void){
+    shadow_shapes.clear();
 }
 void VisualView::reset_dynamic_shapes(void){
     // Map itself is untouched
@@ -240,28 +310,49 @@ void VisualView::reset_dynamic_shapes(void){
     for(mut shapes : dynamic_shape_vectors){
         shapes.clear();}
 }
-void VisualView::draw_static_shape(Shape shape, ColoringType type) {
-    static_shape_vectors[type].push_back(shape);}
-void VisualView::draw_dynamic_shape(Shape shape, ColoringType type){
+void VisualView::draw_shadow_shape(Shape shape) {
+    shadow_shapes.push_back(shape);}
+void VisualView::draw_dynamic_shape(Shape shape, ColoringType type) {
     dynamic_shape_vectors[type].push_back(shape);}
-
+//use first
+void VisualView::draw_background(Shape shape, ColoringType type) {
+    // pl(dynamic_shape_vectors[type].size());
+    background = shape;
+    background_ct = type;
+    //0'st
+    dynamic_shape_vectors[type].push_back(shape);
+    // pl(dynamic_shape_vectors[type].size());
+}
 void VisualView::end_main_pass(void) {
+    VkCommandBuffer& commandBuffer = graphicsCommandBuffers.current();
     // Now, given shapes in vector, we need to send them to GPU and render
-// println
+    copyShadowShapesToGPU();
     copyDynamicShapesToGPU();
-// println
-    drawShapes();
-// println
-    render.cmdNextSubpass(graphicsCommandBuffers.current(), &mainPass);
-    render.cmdBindPipe(graphicsCommandBuffers.current(), bloomExtractPipe);
-    render.cmdDraw(graphicsCommandBuffers.current(), 3, 1, 0, 0);
 
-    render.cmdEndRenderPass(graphicsCommandBuffers.current(), &mainPass);
-// println
+    //shadows
+    render.cmdBeginRenderPass(commandBuffer, &shadowPass);
+        render.cmdBindPipe(commandBuffer, shadowPipe);
+        vkCmdSetLineWidth(commandBuffer, 1.0); // TODO? seems like i dont need it
+        VkDeviceSize shadowOffset = 0;
+        if (shadow_shapes.size() > 0) [[likely]] {
+            render.cmdBindVertexBuffers(commandBuffer, 0, 1, &shadowShapeBuffer.current().buffer, &shadowOffset);
+            render.cmdDraw(commandBuffer, 2, shadow_shapes.size(), 0, 0);
+        }
+    render.cmdEndRenderPass(commandBuffer, &shadowPass);
+
+    render.cmdBeginRenderPass(graphicsCommandBuffers.current(), &mainPass);
+        drawShapes();
+        // extract bloom to image
+        render.cmdNextSubpass(commandBuffer, &mainPass);
+        render.cmdBindPipe(commandBuffer, bloomExtractPipe);
+        render.cmdDraw(commandBuffer, 3, 1, 0, 0);
+    render.cmdEndRenderPass(commandBuffer, &mainPass);
+
 }
 
 void VisualView::mipmap_bloom(void) {
-    // Generate mipmaps and apply bloom
+    // Generate mipmaps for bloom here?
+
 }
 
 void VisualView::bloom_pass(void) {
@@ -345,7 +436,7 @@ void VisualView::bloom_pass(void) {
         render.cmdBindPipe(graphicsCommandBuffers.current(), bloomDownsamplePipe);
         int mip_w = w / (1 << (mip+1));
         int mip_h = h / (1 << (mip+1));
-        render.cmdDispatch(graphicsCommandBuffers.current(), mip_w/8, mip_h/8, 1);
+        render.cmdDispatch(graphicsCommandBuffers.current(), (mip_w+7)/8, (mip_h+7)/8, 1);
     }
 
 
@@ -434,7 +525,7 @@ void VisualView::end_frame(void) {
     
     graphicsCommandBuffers.move();
     copyCommandBuffers.move();
-    staticShapeBuffer.move();
+    shadowShapeBuffer.move();
     dynamicShapeBuffer.move();
     
     frame.move();
@@ -444,50 +535,49 @@ void VisualView::end_frame(void) {
 
 void VisualView::createShapeBuffers(){
     VkDeviceSize 
-        bufferSize = sizeof(Shape) * max_static_shape_count;
-    render.createBufferStorages(&staticShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
-    render.mapBufferStorages(&staticShapeBuffer);
+        bufferSize = sizeof(Shape) * max_shadow_shape_count;
+    render.createBufferStorages(&shadowShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
+    render.mapBufferStorages(&shadowShapeBuffer);
         bufferSize = sizeof(Shape) * max_dynamic_shape_count;
     render.createBufferStorages(&dynamicShapeBuffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
     render.mapBufferStorages(&dynamicShapeBuffer);
 }
 void VisualView::createUniformBuffer(){
     VkDeviceSize 
-        bufferSize = 28;
+        bufferSize = sizeof(ubo_cpu);
     render.createBufferStorages(&uniform, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, bufferSize, true);
     render.mapBufferStorages(&uniform);
 }
 
-void VisualView::copyStaticShapesToGPU(){
+void VisualView::copyShadowShapesToGPU(){
     VkDeviceSize offset = 0;
-    for (let shapes : static_shape_vectors) {
-        VkDeviceSize size = sizeof(Shape) * shapes.size();
-        assert(offset + size <= sizeof(Shape) * max_static_shape_count);
+    // for (let shapes : shadow_shape_vectors) {
+    VkDeviceSize size = sizeof(Shape) * shadow_shapes.size();
+    if(size > 0) [[likely]] {
+        assert(offset + size <= sizeof(Shape) * max_shadow_shape_count);
 
-        memcpy((char*)staticShapeBuffer.current().mapped + offset, shapes.data(), size);
+        memcpy((char*)shadowShapeBuffer.current().mapped + offset, shadow_shapes.data(), size);
         offset += size;
     }
+    // }
 }
 void VisualView::copyDynamicShapesToGPU(){
-// println
-        VkDeviceSize offset = 0;
-// println
-        for (let shapes : dynamic_shape_vectors) {
-            VkDeviceSize size = sizeof(Shape) * shapes.size();
-            if(size > 0){
-                assert(offset + size <= sizeof(Shape) * max_dynamic_shape_count);
-                dynamicShapeBuffer.current();
+    VkDeviceSize offset = 0;
+    for (let shapes : dynamic_shape_vectors) {
+        VkDeviceSize size = sizeof(Shape) * shapes.size();
+        if(size > 0) [[likely]] {
+            assert(offset + size <= sizeof(Shape) * max_dynamic_shape_count);
 
-                memcpy((char*)dynamicShapeBuffer.current().mapped + offset, shapes.data(), size);
-                offset += size;
-            }
+            memcpy((char*)dynamicShapeBuffer.current().mapped + offset, shapes.data(), size);
+            offset += size;
         }
-}
+    }
+    }
 
 void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> fshaderFiles){
     //so they can be in any order
     for (let [coloringType, fragmentShaderFile] : fshaderFiles) {
-        RasterPipe& pipe = fillerPipes[coloringType];
+        RasterPipe& pipe = filler_pipes[coloringType];
         render.pipeBuilder.setStages({
             {"shaders/compiled/default.vert.spv", VK_SHADER_STAGE_VERTEX_BIT},
             {fragmentShaderFile, VK_SHADER_STAGE_FRAGMENT_BIT}
@@ -507,10 +597,12 @@ void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> 
     }
 }
 void VisualView::updateUniformBuffers(){
-    struct {vec2 pos, size; ivec2 res; float time;} unicopy = {
-        camera.cameraPos, camera.cameraScale,
-        ivec2(render.swapChainExtent.width, render.swapChainExtent.height), float(glfwGetTime())};
-    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(unicopy), &unicopy);    
+    ubo_cpu.pos = camera.cameraPos;
+    ubo_cpu.res = ivec2(render.swapChainExtent.width, render.swapChainExtent.height);
+    ubo_cpu.size = camera.cameraScale;
+    ubo_cpu.time = float(glfwGetTime());
+
+    vkCmdUpdateBuffer(graphicsCommandBuffers.current(), uniform.current().buffer, 0, sizeof(ubo_cpu), &ubo_cpu);    
     render.cmdPipelineBarrier (graphicsCommandBuffers.current(),
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT|VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -520,26 +612,33 @@ void VisualView::updateUniformBuffers(){
 void VisualView::drawShapes() {
     VkDeviceSize staticOffset = 0;
     VkDeviceSize dynamicOffset = 0;
-    VkCommandBuffer commandBuffer = graphicsCommandBuffers.current();
+    VkCommandBuffer& commandBuffer = graphicsCommandBuffers.current();
+    
     // Draw corresponding shapes for each pair of {coloringType, pipe}
     // Total ColoringType's * 2 drawcalls
+
     for (int coloringType=0; coloringType<COLORING_TYPE_SIZE; coloringType++) {
-        render.cmdBindPipe(commandBuffer, fillerPipes[coloringType]);
-
-        // Draw static shapes
-        let staticShapes = static_shape_vectors[coloringType];
-        if (staticShapes.size() > 0) {
-            render.cmdBindVertexBuffers(commandBuffer, 0, 1, &staticShapeBuffer.current().buffer, &staticOffset);
-            render.cmdDraw(commandBuffer, 6, staticShapes.size(), 0, 0);
-            staticOffset += sizeof(Shape) * staticShapes.size();
-        }
-
-        // Draw dynamic shapes
-        let dynamicShapes = dynamic_shape_vectors[coloringType];
-        if (dynamicShapes.size() > 0) {
+        render.cmdBindPipe(commandBuffer, filler_pipes[coloringType]);
+        int shapes2draw = dynamic_shape_vectors[coloringType].size();
+        
+        //crutch but decreases state change
+        if (coloringType == background_ct) {
+            // draw background
             render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &dynamicOffset);
-            render.cmdDraw(commandBuffer, 6, dynamicShapes.size(), 0, 0);
-            dynamicOffset += sizeof(Shape) * dynamicShapes.size();
+            render.cmdDraw(commandBuffer, 6, 1, 0, 0);
+            dynamicOffset += sizeof(Shape);
+            shapes2draw--; // cause [already] drawn here
+            // draw under other shapes shadows
+            render.cmdBindPipe(commandBuffer, shadowApplyPipe);
+            render.cmdDraw(commandBuffer, 3, 1, 0, 0);
+            // rebind old one back
+            render.cmdBindPipe(commandBuffer, filler_pipes[coloringType]);
+        }
+        // Draw dynamic shapes
+        if (shapes2draw > 0) {
+            render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &dynamicOffset);
+            render.cmdDraw(commandBuffer, 6, shapes2draw, 0, 0);
+            dynamicOffset += sizeof(Shape) * shapes2draw;
         }
     }
 }

@@ -5,17 +5,15 @@
 
 #include "glm/ext/vector_uint3_sized.hpp"
 #include <iostream>
-struct Card {
-    // Card Identification
-    const char* name = ""; // The name of the card
 
-    // --- Stat Buffs (Multipliers and Additives) ---
-    
-    // Health and Damage Buffs
+//default values are used because no actual date movement happenes and this way is easier to define cosnt cards
+struct Card {
+    const char* name = "";
+
     float hp_mul = 1.0f;                // *HP multiplier (0.0f = no change)
     float damage_mul = 1.0f;            // *Damage multiplier (1.0f = no change)
 
-    // Bullet and Shooting Attributes
+    // core bullet stats
     float bullet_speed_mul = 1.0f;      // *Bullet speed multiplier (1.0f = no change)
     float reload_time_mul = 1.0f;       // *Reload time multiplier (1.0f = no change)
     float reload_time_add = 0.0f;       // +Flat increase to reload time
@@ -25,30 +23,29 @@ struct Card {
     float bullet_radius_add = 0.0f;     // +Flat addition to bullet radius
     int ammo_add = 0;                   // +Additional ammo capacity (0 = no additional ammo)
 
-    // Player Movement and Control Buffs
+    // Movement
     float knockback_add = 0.0f;         // +Knockback effect on hit (0.0f = no additional knockback)
-    float jump_impulse_add = 0.0f;       // +Jump height increase (0.0f = no additional jump height)
+    float jump_impulse_add = 0.0f;      // +Jump height increase (0.0f = no additional jump height)
     int jumps_add = 0;                  // +Additional jumps (0 = no extra jumps)
     float chase_speed_add = 0.0f;       // +Chase speed when moving towards the target
     float movement_speed_add = 0.0f;    // +Flat movement speed bonus
 
-    // Defensive Buffs
     int lives_add = 0;                  // +Extra lives (0 = no extra lives)
     float block_cooldown_add = 0.0f;    // +Flat decrease to block cooldown
 
-    // --- Weapon Modifiers and Effects ---
-
-    // Bullet/Weapon Effects
-    int bullet_bounces_add = 0;             // +Additional bullet bounces (0 = no bounces)
-    int extra_bullets_per_shot_add = 0;     // +Extra bullets fired per shot (0 = normal shot)
-    float splash_damage_add = 0.0f;         // +Flat splash damage (0.0f = no splash damage)
-    float bullet_slow_percentage_add = 0.0f; // +Percentage slowdown applied by bullets (0.0f = no slow effect)
-    float damage_over_time_add = 0.0f;      // +Damage over time (e.g., poison, parasite)
-    float life_steal_percentage_add = 0.0f; // +Life steal percentage (0.0f = no life steal)
-    float explosion_radius_add = 0.0f;      // +Explosion radius on bullet impact
-    float homing_force_add = 0.0f;          // +Homing force applied to bullets
+    // more special effects
+    int bullet_bounces_add = 0;                // +Additional bullet bounces (0 = no bounces)
+    float bullet_bounce_damage_add = 0;        // +Additional damage per bounce (0 = no bonus)
+    int extra_bullets_per_shot_add = 0;        // +Extra bullets fired per shot (0 = normal shot)
+    float grow_factor_add;                     // multiplier per second. if 10, then damage *= 11 every second
+    float splash_damage_add = 0.0f;            // +Flat splash damage (0.0f = no splash damage)
+    float bullet_slow_percentage_add = 0.0f;   // +Percentage slowdown applied by bullets (0.0f = no slow effect)
+    float damage_over_time_add = 0.0f;         // +Damage over time (e.g., poison, parasite)
+    float life_steal_percentage_add = 0.0f;    // +Life steal percentage (0.0f = no life steal)
+    float explosion_radius_add = 0.0f;         // +Explosion radius on bullet impact
+    float homing_force_add = 0.0f;             // +Homing force applied to bullets
     float poison_damage_percentage_add = 0.0f; // +Percentage of damage converted to poison damage
-    float stun_duration_add = 0.0f;         // +Stun duration (0.0f = no stun effect)
+    float stun_duration_add = 0.0f;            // +Stun duration (0.0f = no stun effect)
 
     // Special Effects on Block
     float teleport_distance_on_block_add = 0.0f; // +Teleport distance when blocking (0.0f = no teleport)
@@ -56,62 +53,52 @@ struct Card {
     float saw_damage_on_block_add = 0.0f;        // +Saw damage when blocking (0.0f = no saw)
     float dark_power_charge_time_add = 0.0f;     // +Dark power charge time (0.0f = no dark power)
 
-    // Visual Effects
+    // Visuals
     glm::u8vec3 bullet_color = {255, 255, 255};  // =Bullet color (default white)
-    bool has_custom_bullet_color = false;        // Whether the custom bullet color is active
+    bool has_custom_bullet_color = false;        // ?Whether the custom bullet color is active
 
-    // Function to print card details
     void printCard() const {
-        std::cout << "Card Name: " << name << "\n";
+        Card defaultCard = Card(); // for comparison
 
-        // Print stat buffs
-        std::cout << "Stat Buffs:\n";
-        std::cout << "  HP Multiplier: " << hp_mul << "\n";
-        std::cout << "  Damage Multiplier: " << damage_mul << "\n";
-        std::cout << "  Bullet Speed Multiplier: " << bullet_speed_mul << "\n";
-        std::cout << "  Reload Time Add: " << reload_time_add << "\n";
-        std::cout << "  Reload Time Multiplier: " << reload_time_mul << "\n";
-        std::cout << "  Shoot Time Multiplier: " << shoot_time_mul << "\n";
-        std::cout << "  Ammo Add: " << ammo_add << "\n";
-        std::cout << "  Bullet Radius Add: " << bullet_radius_add << "\n";
-        
-        // Print movement and control buffs
-        std::cout << "Movement Buffs:\n";
-        std::cout << "  Knockback Add: " << knockback_add << "\n";
-        std::cout << "  Jump Height Add: " << jump_impulse_add << "\n";
-        std::cout << "  Additional Jumps: " << jumps_add << "\n";
-        std::cout << "  Chase Speed Add: " << chase_speed_add << "\n";
-        std::cout << "  Movement Speed Add: " << movement_speed_add << "\n";
-        std::cout << "  Extra Lives Add: " << lives_add << "\n";
-        std::cout << "  Block Cooldown Add: " << block_cooldown_add << "\n";
+        std::cout << "Card: " << name << "\n";
 
-        // Print weapon effects and modifiers
-        std::cout << "Weapon Effects:\n";
-        std::cout << "  Bullet Bounces Add: " << bullet_bounces_add << "\n";
-        std::cout << "  Extra Bullets per Shot Add: " << extra_bullets_per_shot_add << "\n";
-        std::cout << "  Splash Damage Add: " << splash_damage_add << "\n";
-        std::cout << "  Bullet Slow Percentage Add: " << bullet_slow_percentage_add << "\n";
-        std::cout << "  Damage Over Time Add: " << damage_over_time_add << "\n";
-        std::cout << "  Life Steal Percentage Add: " << life_steal_percentage_add << "\n";
-        std::cout << "  Explosion Radius Add: " << explosion_radius_add << "\n";
-        std::cout << "  Homing Force Add: " << homing_force_add << "\n";
-        std::cout << "  Poison Damage Percentage Add: " << poison_damage_percentage_add << "\n";
-        std::cout << "  Stun Duration Add: " << stun_duration_add << "\n";
+        if (hp_mul != defaultCard.hp_mul) std::cout << "  HP Multiplier: " << hp_mul << "\n";
+        if (damage_mul != defaultCard.damage_mul) std::cout << "  Damage Multiplier: " << damage_mul << "\n";
+        if (bullet_speed_mul != defaultCard.bullet_speed_mul) std::cout << "  Bullet Speed Multiplier: " << bullet_speed_mul << "\n";
+        if (reload_time_add != defaultCard.reload_time_add) std::cout << "  Reload Time Add: " << reload_time_add << "\n";
+        if (reload_time_mul != defaultCard.reload_time_mul) std::cout << "  Reload Time Multiplier: " << reload_time_mul << "\n";
+        if (shoot_time_mul != defaultCard.shoot_time_mul) std::cout << "  Shoot Time Multiplier: " << shoot_time_mul << "\n";
+        if (ammo_add != defaultCard.ammo_add) std::cout << "  Ammo Add: " << ammo_add << "\n";
+        if (bullet_radius_add != defaultCard.bullet_radius_add) std::cout << "  Bullet Radius Add: " << bullet_radius_add << "\n";
 
-        // Print block effects
-        std::cout << "Block Effects:\n";
-        std::cout << "  Teleport Distance on Block: " << teleport_distance_on_block_add << "\n";
-        std::cout << "  Bombs on Block Add: " << bombs_on_block_add << "\n";
-        std::cout << "  Saw Damage on Block Add: " << saw_damage_on_block_add << "\n";
-        std::cout << "  Dark Power Charge Time Add: " << dark_power_charge_time_add << "\n";
+        if (knockback_add != defaultCard.knockback_add) std::cout << "  Knockback Add: " << knockback_add << "\n";
+        if (jump_impulse_add != defaultCard.jump_impulse_add) std::cout << "  Jump Height Add: " << jump_impulse_add << "\n";
+        if (jumps_add != defaultCard.jumps_add) std::cout << "  Additional Jumps: " << jumps_add << "\n";
+        if (chase_speed_add != defaultCard.chase_speed_add) std::cout << "  Chase Speed Add: " << chase_speed_add << "\n";
+        if (movement_speed_add != defaultCard.movement_speed_add) std::cout << "  Movement Speed Add: " << movement_speed_add << "\n";
+        if (lives_add != defaultCard.lives_add) std::cout << "  Extra Lives Add: " << lives_add << "\n";
+        if (block_cooldown_add != defaultCard.block_cooldown_add) std::cout << "  Block Cooldown Add: " << block_cooldown_add << "\n";
 
-        // Print visual effects
+        if (bullet_bounces_add != defaultCard.bullet_bounces_add) std::cout << "  Bullet Bounces Add: " << bullet_bounces_add << "\n";
+        if (extra_bullets_per_shot_add != defaultCard.extra_bullets_per_shot_add) std::cout << "  Extra Bullets per Shot Add: " << extra_bullets_per_shot_add << "\n";
+        if (splash_damage_add != defaultCard.splash_damage_add) std::cout << "  Splash Damage Add: " << splash_damage_add << "\n";
+        if (bullet_slow_percentage_add != defaultCard.bullet_slow_percentage_add) std::cout << "  Bullet Slow Percentage Add: " << bullet_slow_percentage_add << "\n";
+        if (damage_over_time_add != defaultCard.damage_over_time_add) std::cout << "  Damage Over Time Add: " << damage_over_time_add << "\n";
+        if (life_steal_percentage_add != defaultCard.life_steal_percentage_add) std::cout << "  Life Steal Percentage Add: " << life_steal_percentage_add << "\n";
+        if (explosion_radius_add != defaultCard.explosion_radius_add) std::cout << "  Explosion Radius Add: " << explosion_radius_add << "\n";
+        if (homing_force_add != defaultCard.homing_force_add) std::cout << "  Homing Force Add: " << homing_force_add << "\n";
+        if (poison_damage_percentage_add != defaultCard.poison_damage_percentage_add) std::cout << "  Poison Damage Percentage Add: " << poison_damage_percentage_add << "\n";
+        if (stun_duration_add != defaultCard.stun_duration_add) std::cout << "  Stun Duration Add: " << stun_duration_add << "\n";
+
+        if (teleport_distance_on_block_add != defaultCard.teleport_distance_on_block_add) std::cout << "  Teleport Distance on Block: " << teleport_distance_on_block_add << "\n";
+        if (bombs_on_block_add != defaultCard.bombs_on_block_add) std::cout << "  Bombs on Block Add: " << bombs_on_block_add << "\n";
+        if (saw_damage_on_block_add != defaultCard.saw_damage_on_block_add) std::cout << "  Saw Damage on Block Add: " << saw_damage_on_block_add << "\n";
+        if (dark_power_charge_time_add != defaultCard.dark_power_charge_time_add) std::cout << "  Dark Power Charge Time Add: " << dark_power_charge_time_add << "\n";
+
         std::cout << "Visual Effects:\n";
         if (has_custom_bullet_color) {
             std::cout << "  Bullet Color: (" << (int)bullet_color.r << ", " 
-                      << (int)bullet_color.g << ", " << (int)bullet_color.b << ")\n";
-        } else {
-            std::cout << "  Bullet Color: Default (White)\n";
+                    << (int)bullet_color.g << ", " << (int)bullet_color.b << ")\n";
         }
     }
 };
@@ -124,6 +111,14 @@ DEFINE_CARD(Barrage)
     .spread_add = 0.13f,
     .ammo_add = 5,
     .extra_bullets_per_shot_add = 4,
+};
+
+DEFINE_CARD(Spray)
+    .damage_mul = 0.25f,
+    .reload_time_add = 0.25f,
+    .shoot_time_mul = .1,
+    .spread_add = 0.1f,
+    .ammo_add = 12,
 };
 
 DEFINE_CARD(Big_bullet)
@@ -142,8 +137,15 @@ DEFINE_CARD(Bouncy)
     .bullet_bounces_add = 2,
 };
 
+DEFINE_CARD(Trickster)
+    .damage_mul = 0.8f,
+    .reload_time_add = 0.5f,
+    .bullet_bounces_add = 2,
+    .bullet_bounce_damage_add = .8f,
+};
+
 DEFINE_CARD(Brawler)
-    // No stat changes are provided,
+    // No stat changes yet
 };
 
 DEFINE_CARD(Buckshot)
@@ -192,7 +194,7 @@ DEFINE_CARD(Combine)
 
 DEFINE_CARD(Dazzle)
     .reload_time_add = 0.25f,
-    .stun_duration_add = 0.5f // Assuming stun duration based on the description,
+    .stun_duration_add = 0.5f
 };
 
 DEFINE_CARD(Decay)
@@ -257,6 +259,7 @@ DEFINE_CARD(Glass_cannon)
 
 DEFINE_CARD(Grow)
     .reload_time_add = 0.25f,
+    .grow_factor_add = 0.42f
 };
 
 DEFINE_CARD(Healing_field)
@@ -291,9 +294,11 @@ DEFINE_CARD(Lifestealer)
 
 const Card cards[] = {
     Barrage,
+    Spray,
     Big_bullet,
     Bombs_away,
     Bouncy,
+    Trickster,
     Brawler,
     Buckshot,
     Burst,

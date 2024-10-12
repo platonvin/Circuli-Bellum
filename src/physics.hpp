@@ -49,6 +49,8 @@ public:
         b2WorldDef worldDef = b2DefaultWorldDef();
         world_id = b2CreateWorld(&worldDef);
         b2World_SetGravity(world_id, gravity);
+        // b2SetLengthUnitsPerMeter(100);
+
     }
     void cleanup() {
         b2DestroyWorld(world_id);
@@ -147,5 +149,75 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
     b2Body_SetUserData(bind->body, user_data);
     b2Shape_SetUserData(bind->shape, user_data);
 }
+
+// basically for light.
+struct DoublePendulum{
+    // Angles 
+    float theta1 = glm::radians(120.0);
+    float theta2 = glm::radians(100.0);
+    // Angular velocities
+    float omega1 = 0;
+    float omega2 = 0;  
+
+    const float g = 9.81f;
+    const float length1 = 1.0f;
+    const float length2 = 1.0f;
+    const float mass1 = 1.0f;
+    const float mass2 = 1.0f;
+    const float damping = 0.99f;
+
+    void simulate(float dTime) {
+        // Extract current angles and angular velocities
+        // float theta1 = theta1;
+        // float theta2 = theta2;
+        // float omega1 = omega1;
+        // float omega2 = omega2;
+
+        // Equations of motion for the double pendulum
+        float deltaTheta = theta2 - theta1;
+
+        float denominator1 = (mass1 + mass2) * length1 - mass2 * length1 * cos(deltaTheta) * cos(deltaTheta);
+        float denominator2 = (length2 / length1) * denominator1;
+
+        float num1 = -g * (2 * mass1 + mass2) * sin(theta1) - mass2 * g * sin(theta1 - 2 * theta2) - 2 * sin(deltaTheta) * mass2 * (omega2 * omega2 * length2 + omega1 * omega1 * length1 * cos(deltaTheta));
+        float num2 = 2 * sin(deltaTheta) * (omega1 * omega1 * length1 * (mass1 + mass2) + g * (mass1 + mass2) * cos(theta1) + omega2 * omega2 * length2 * mass2 * cos(deltaTheta));
+
+        // Update angular accelerations
+        float alpha1 = num1 / denominator1;
+        float alpha2 = num2 / denominator2;
+
+        // Apply Euler integration to update the angular velocities
+        omega1 += alpha1 * dTime;
+        omega2 += alpha2 * dTime;
+
+        // Apply damping (decay)
+        omega1 *= damping;
+        omega2 *= damping;
+
+        // Update the angles using the new angular velocities
+        theta1 += omega1 * dTime;
+        theta2 += omega2 * dTime;
+
+        // Store the new values back in the pendulum state
+        // theta1 = theta1;
+        // theta2 = theta2;
+        // omega1 = omega1;
+        // omega2 = omega2;
+    }
+
+    void apply_impulse(float impulse1, float impulse2) {
+        omega1 += impulse1;
+        omega2 += impulse2;
+    }
+
+    glm::vec2 get_pendulum_position1() {
+        return glm::vec2(length1 * sin(theta1), -length1 * cos(theta1));
+    }
+
+    glm::vec2 get_pendulum_position2() {
+        glm::vec2 pos1 = get_pendulum_position1();
+        return pos1 + glm::vec2(length2 * sin(theta2), -length2 * cos(theta2));
+    }
+};
 
 #endif // __PHYSICS_HPP__

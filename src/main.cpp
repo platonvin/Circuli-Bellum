@@ -39,12 +39,12 @@ l()
     while ((!glfwWindowShouldClose(scene.view.render.window.pointer)) && (!glfwGetKey(scene.view.render.window.pointer, GLFW_KEY_ESCAPE))) {
         glfwPollEvents();
         current = glfwGetTime();
-        if((current - previous) > 0.01){
+        // if((current - previous) > 0.005){
 
             scene.tick(current - previous);
             
             previous = current;
-        }
+        // }
     }
 
     // Clean up

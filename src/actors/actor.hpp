@@ -1,36 +1,29 @@
 #pragma once
+#ifndef __ACTOR_HPP__
+#define __ACTOR_HPP__
 #include "box2d/types.h"
 #include "data_structures/fixed_map.hpp"
 #include "physics.hpp"
 #include "visual.hpp"
-#ifndef __ACTOR_HPP__
-#define __ACTOR_HPP__
-
-//absolutely legit and 100% safe code
-//this is to store information in box2d pointer
-//TODO test just llint
-inline int ptr2id(void* ptr){
-    return (int)(long long int)(ptr);
-}
-inline void* id2ptr(int id){
-    return (void*)(long long int)(id);
-}
 
 // also used for box2d bits
 enum class ActorType : int {
-    Projectile = 1 << 0,
-    Player     = 1 << 1,
-    PlayerLeg  = 1 << 2,
-    Scenery    = 1 << 3,
-    Border     = 1 << 4,
-    // Steppable
+    Projectile     = 1 << 0,
+    Player         = 1 << 1,
+    PlayerLeg      = 1 << 2,
+    StaticScenery  = 1 << 3,
+    DynamicScenery = 1 << 4,
+    Border         = 1 << 5, // does not refill jump btw
 
     ProjectilePlayer = Projectile|Player,
-    PlayerScenery = Player|Scenery,
-    SceneryProjectile = Scenery|Projectile,
-    SceneryBorder = Scenery|Border, // literally scene bounding box (border)
+    PlayerScenery = Player|StaticScenery,
+    SceneryProjectile = StaticScenery|Projectile,
+    StaticSceneryBorder = StaticScenery|Border, // literally scene bounding box (border)
+    DynamicSceneryBorder = DynamicScenery|Border, // literally scene bounding box (border)
+    PlayerBorder = Player|Border,
+    PlayerLegBorder = PlayerLeg|Border,
     PlayerPlayerLeg = Player|PlayerLeg, // literally scene bounding box (border)
-    SceneryPlayerLeg = Scenery|PlayerLeg, // literally scene bounding box (border)
+    SceneryPlayerLeg = StaticScenery|PlayerLeg, // literally scene bounding box (border)
 };
 
 inline constexpr ActorType operator&(ActorType x, ActorType y){
@@ -45,51 +38,38 @@ inline std::ostream& operator<<(std::ostream& o, ActorType a){
 }
 
 // not full
-inline ShapeType convertShapeType(b2ShapeType b2type){
-    switch (b2type) {
-        case b2_circleShape: return Circle;
-        case b2_capsuleShape: return Capsule;
-        case b2_polygonShape: return Rectangle;
-        default: assert(false);
-    }
-}
+ShapeType convertShapeType(b2ShapeType b2type);
 // loses info
-inline b2ShapeType convertShapeType(ShapeType mineType){
-    switch (mineType) {
-        case Circle: return b2_circleShape;
-        case Capsule: return b2_capsuleShape;
-        case Rectangle: return b2_polygonShape;
-        case Trapezoid: return b2_polygonShape;
-        default: assert(false);
-    }
-}
-class Actor {
+b2ShapeType convertShapeType(ShapeType mineType);
+
+//has no update/destroy, instead is changed from move events and by higher-level enteties
+struct Actor {
 public:
     //both type in actor and actor in anything else
     //should be first for custom rtti :)
-    ActorType actorType;
-    PhysicalState state;
-    PhysicalProperties properties;
-    PhysicalBindings bindings;
+    ActorType actorType = {};
+    PhysicalState state = {};
+    PhysicalProperties properties = {};
+    PhysicalBindings bindings = {};
 
-    ShapeProps shapeProps;
+    ShapeProps shapeProps = {};
 
-    //has no update/destroy, instead is changed from move events and by higher-level enteties
-    
+    // i didn't want to use constructors, but it is really not doing anythinh
+    // The road to unreadable code is paved with readability intentions
     Actor(ActorType actorType, b2BodyType bodyType, ShapeType shapeType, u8vec3 coloring_info, vec2 pos, ShapeProps shapeProps) : 
         actorType{actorType}, 
         state{.pos=pos},
         properties{ .color=coloring_info, .shape_type=shapeType, .body_type=bodyType},
         shapeProps(shapeProps) {}
-    
-    Shape constructActorShape();
+
+    Shape constructActorShape() const;
 };
 
 //changed by game actions. Reset on new round
 struct PlayerState{
     int jumps_left = 0;
     // how much time after last jump refresh passed, in seconds
-    // double last_jmp_refill = 0.0;
+    float time_since_jump_refill = 0.0;
     int touching_grass_counter = 0;
     // there is 1 frame delay between jumping and touching grass set to false, so we need to delay refill too
     bool refill_body_jumps_next_frame = false;
@@ -106,24 +86,26 @@ struct PlayerState{
     int ammunition_left = 0; //in magazine
 };
 //changed by cards. Reset on new game
-struct PlayerProps {
-    // Core Attributes
-    double health_points = 100;            // Total health points
-    int max_lives = 1;                     // Maximum number of lives
-    int max_jumps = 1;                     // Maximum number of jumps per round
-    float jump_impulse = 20;                 // Impulse applied when jumping
-    float player_mass = 1.0f;              // Player's physical mass
-    float player_radius = 0.5;             // Size of the player (hitbox radius)
-    
-    // Weapon/Bullet Attributes
-    float bullet_size = 0.1;               // Radius of each bullet
-    double bullet_damage = 15;             // Damage per bullet hit
-    double reload_duration = 2;            // Total time to reload the weapon
-    double shot_delay = 1;                 // Delay between consecutive shots from the same magazine
-    double bullet_velocity = 17.0;         // Speed at which bullets travel
-    int bullets_per_magazine = 3;          // Number of bullets per magazine
-    int bullet_bounce_count = 0;           // Number of times a bullet can bounce off surfaces
-    int extra_bullets_per_shot = 0;        // Additional bullets fired per shot (spread)
+struct PlayerProps{
+    double hp = 100;
+    int max_lives = 1;
+    int max_jumps = 1;
+    float jump_impulse = 20;
+    float mass = 1.0f;
+    float radius = 0.5;
+    float bullet_radius = 0.1;
+    double bullet_damage = 15;
+    double reload_duration = 2; //between closest shots from separate magazines
+    double shot_delay = 1; //between shots from same magazine
+    double bullet_speed = 17.0;
+    int max_ammo = 3;
+    int bullet_bounces = 0;
+    float extra_damage_per_bounce = 0;
+    float grow_factor = 0;
+    u8vec3 bullet_color = twpp::lime(200);
+    double block_delay = 10;
+    int bullets_per_shot = 1;        // Additional bullets fired per shot (spread)
+    float spread = 0.05;
 
     float life_steal_percentage = 0.0f;    // Percentage of damage converted to health restoration
 
@@ -151,19 +133,20 @@ struct PlayerProps {
     float chase_speed_multiplier = 1.0f;   // Speed multiplier when moving towards the opponent
     
     // Visual Effects
-    glm::u8vec3 bullet_color = twpp::lime(200); // Color of the bullets (RGB format)
 };
 
 struct ProjectileState {
-    double damage;
-    float radius;
-    int bounces_left=1;
+    double damage = 0;
+    double radius = 0;
+    int bounces_left =1;
 };
 struct ProjectileProps{
-    double damage;
+    float damage = 0;
     float radius = 1.0;
     int max_bounces = 1;
-    float bounciness = 0.9;
+    float extra_damage_per_bounce = 0; // Trickster thing. Increase damage on bounce
+    float bounciness = 0.9; // physicsal property
+    float grow_factor = 0; // multiplier per second. if 10, then damage *= 11 every second
 };
 
 struct SceneryState{
@@ -172,6 +155,6 @@ struct SceneryState{
 struct SceneryProps{
     double durability; //basically hp
     double contactDamage; //on touch
-    double gravityMultiplier; //when inside
+    double gravityMultiplier; //when inside. Water?
 };
 #endif // __ACTOR_HPP__
