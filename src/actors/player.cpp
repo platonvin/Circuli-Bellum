@@ -378,7 +378,7 @@ void Player::drawBlock(VisualView* view) {
     }
 }
 void Player::drawBody(VisualView* view) {
-    debugView = view;
+    // debugView = view;
     view->draw_dynamic_shape(constructShape(), SolidColor);
 }
 void Player::drawLegs(VisualView* view) {

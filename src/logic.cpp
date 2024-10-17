@@ -105,42 +105,82 @@ void LogicalScene::endRound(){
 }
 
 // there is no choise. DRAW A CARD
-void LogicalScene::giveCardsToDeadPlayers(){
-    for(mut p : players) {
-        if(p.state.lives_left == 0){
-            if(&p == slave){
-                // = minimize
-                glfwIconifyWindow(view.render.window.pointer);
-                    std::cout << "CHOOSE A CARD (type id in terminal)\n";
+void LogicalScene::giveCardsToDeadPlayers() {
+    auto generateCardChoices = [&](std::array<const Card*, 5>& choices) {
+        for (int i = 0; i < choices.size(); i++) {
+            const Card* card;
+            do {
+                card = &cards[rand() % std::size(cards)];
+            } while (std::find(choices.begin(), choices.end(), card) != choices.end());
+            choices[i] = card;
+            std::cout << "ID: " << i + 1 << " ";
+            choices[i]->printCard();
+        }
+    };
 
-                    std::array<const Card*, 5> choise = {0};
-                    for(int i=0; i<choise.size(); i++){
-                        const Card* card;
-                        label_pick_a_card_for_choise:
-                            card = &cards[rand() % std::size(cards)];
-                        if (std::find_if(choise.begin(), choise.end(), [card](const Card* cp) {return cp==card;}) != choise.end()) 
-                            goto label_pick_a_card_for_choise;
-                        choise[i] = card;
-                        std::cout << "ID: " << i+1 << " "; 
-                        choise[i]->printCard();
+    auto getCardIdFromInput = [&]() -> int {
+        std::string input;
+        std::cin >> input;
+
+        if (input == "cheat") {
+            return -1; // special code
+        }
+
+        // validate input for number
+        for (char c : input) {
+            if (!std::isdigit(c)) {
+                std::cin.clear();
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                std::cout << "invalid card id\n";
+                return 0; // invalid input
+            }
+        }
+
+        int id = std::stoi(input);
+        return id;
+    };
+
+    for (mut p : players) {
+        if (p.state.lives_left == 0) {
+            if (&p == slave) {
+                // minimize window
+                glfwIconifyWindow(view.render.window.pointer);
+                std::cout << "CHOOSE A CARD (type id in terminal)\n";
+
+                std::array<const Card*, 5> choise = {0};
+                generateCardChoices(choise);
+
+                while (true) {
+                    int id = getCardIdFromInput();
+                    if (id == -1) { // cheat detected
+                        std::cout << "Cheat detected! You get 10 extra choices\n";
+                        for (int round = 0; round < 10; ++round) {
+                            std::cout << "ROUND " << round + 1 << " - Choose a card (type id [in terminal]):\n";
+                            generateCardChoices(choise);
+
+                            while (true) {
+                                id = getCardIdFromInput(); // ignore "cheat" this time
+                                if (id >= 1 && id <= choise.size()) {
+                                    p.drawCard(choise[id - 1]);
+                                    choise[id - 1]->printCard();
+                                    std::cout << "\n";
+                                    break;
+                                } else {
+                                    std::cout << "invalid card id\n";
+                                }
+                            }
+                        }
+                    } else if (id >= 1 && id <= choise.size()) {
+                        p.drawCard(choise[id - 1]);
+                        choise[id - 1]->printCard();
+                        std::cout << "\n";
+                        break;
+                    } else {
+                        std::cout << "invalid card id\n";
                     }
-                    int id;
-                    label_try_input:
-                        std::cin >> id;
-                        if (std::cin.fail()) {
-                            std::cin.clear();
-                            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                            std::cout << "invalid card id\n";
-                            goto label_try_input;
-                        }
-                        if(id < 1 || id > choise.size()+1) {
-                            std::cout << "invalid card id";
-                            goto label_try_input;
-                        }
-                    p.drawCard(choise[id-1]);
-                    choise[id-1]->printCard();
-                    std::cout << "\n";
-                glfwRestoreWindow(view.render.window.pointer);                
+                }
+
+                glfwRestoreWindow(view.render.window.pointer);
             } else {
                 int id = rand() % std::size(cards);
                 p.drawCard(&cards[id]);
@@ -249,13 +289,18 @@ void LogicalScene::setupActionCallbacks() {
     );
     input.setActionCallback(Action::DrawRNDcard, 
         [this](Action action) -> void {
-            // int id = rand() % std::size(cards);
-            // slave->drawCard(&cards[id]);
+            int id = rand() % std::size(cards);
+            slave->drawCard(&cards[id]);
             // cards[id].printCard();
             // (rand()%3!=0) ? slave->drawCard(&Spray) : slave->drawCard(&Buckshot);
             // (rand()%5==0) ? slave->drawCard(&Fastball) : (void());
-            slave->drawCard(&Healing_field);
+            // slave->drawCard(&Healing_field);
             // slave->drawCard(&Saw);
+            // slave->drawCard(&Thruster);
+            slave->drawCard(&Spray);
+            slave->drawCard(&Spray);
+            slave->drawCard(&Fast_forward);
+            slave->drawCard(&Bouncy);
         }
     );
     input.setActionCallback(Action::Block, 
@@ -571,7 +616,7 @@ void LogicalScene::tick(double dTime) {
         int activePlayers = countActivePlayers();
         if(activePlayers < 2) {
             endRound();
-            giveCardsToDeadPlayers();
+            // giveCardsToDeadPlayers();
             startNewRound();
         }
     } // end of pause game for debug
