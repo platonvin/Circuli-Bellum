@@ -2,7 +2,7 @@
 
 #include "common/default_vertex.glsl"
 
-layout(location = 0) flat out uvec3 out_coloring_info;
+layout(location = 0) flat out uvec4 out_coloring_info;
 layout(location = 1) flat out uint out_shape_type;
 layout(location = 2) out vec2 out_local_pos;
 layout(location = 3) flat out float out_radius;

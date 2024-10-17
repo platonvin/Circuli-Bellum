@@ -1,4 +1,4 @@
-layout(location = 0) flat in uvec3 coloring_info;
+layout(location = 0) flat in uvec4 coloring_info;
 layout(location = 1) flat in uint shape_type;
 layout(location = 2) in vec2 local_pos;
 layout(location = 3) flat in float extra_sdf_radius;

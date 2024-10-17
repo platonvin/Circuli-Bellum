@@ -7,10 +7,10 @@
 #include "unordered_dense.hpp"
 // #include <unordered_set>
 
-// ~2x faster than new&delete + coherent memory
+// ~2x faster than new&delete + maybe more coherent memory
 // this really was the bottlneck
 
-//TODO: test against garbage vector
+//TODO: test uset against garbage vector
 
 template<typename Type>
 class Arena {
@@ -59,19 +59,15 @@ public:
         int index = *free_indices.begin();
         free_indices.erase(index);
         //called a constructor, just in case
-        storage[index] = {};
-        // return new Type;
-        // memset((void*)&storage[index], 0, sizeof(storage[0]));
+        storage[index] = Type();
 
-        // std::cout << "allocated " << (long long)index  << "\n";
-        // std::cout << "allocated " << (long long)&storage[index] << "\n";
+        // return new Type;
         return &storage[index];
     }
 
     void free(Type* obj_ptr) {
         // delete obj_ptr;
-        // memset((void*)obj_ptr, 0, sizeof(storage[0]));
-        *obj_ptr = {}; // called destructor
+        (*obj_ptr).~Type();
         int idx = (obj_ptr - &storage[0]);
         assert(!free_indices.contains(idx));
         free_indices.insert(idx);

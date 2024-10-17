@@ -39,3 +39,36 @@ float fbm(vec3 position) {
 
     return value;
 }
+
+#define HASHSCALE 0.1031
+float hash(float p) {
+    #ifdef NOISE_PERIOD
+	p = mod(p, NOISE_PERIOD);
+    #endif
+    
+	vec3 p3 = fract(vec3(p) * HASHSCALE);
+    p3 += dot(p3, p3.yzx + 19.19);
+    return fract((p3.x + p3.y) * p3.z);
+}
+float fade(float t) { return t*t*t*(t*(6.*t-15.)+10.); } // interpolation
+float grad(float hash, float p) { // gradient
+    int i = int(1e4*hash);
+	return (i & 1) == 0 ? p : -p;
+}
+float perlinNoise1D(float p) {
+	float pi = floor(p); // integer part of the p
+	float pf = p - pi; // fractional part of the p
+	float w = fade(pf); // use fractional part of the p to interpolate between two integer edges
+    return mix(grad(hash(pi), pf), grad(hash(pi + 1.0), pf - 1.0), w) * 2.0;
+}
+// returns value in interval [-1..+1]
+float fbm(float pos, int octaves, float persistence) {
+	float total = 0., frequency = 1., amplitude = 1., maxValue = 0.;
+	for(int i = 0; i < octaves; ++i) {
+		total += perlinNoise1D(pos * frequency) * amplitude;
+		maxValue += amplitude;
+		amplitude *= persistence;
+		frequency *= 2.;
+	}
+	return total / maxValue;
+}

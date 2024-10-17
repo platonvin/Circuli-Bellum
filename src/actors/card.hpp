@@ -3,7 +3,7 @@
 #define DEFINE_CARD(_name) const Card _name = {\
     .name = #_name,
 
-#include "glm/ext/vector_uint3_sized.hpp"
+#include "glm/ext/vector_uint4_sized.hpp"
 #include <iostream>
 
 //default values are used because no actual date movement happenes and this way is easier to define cosnt cards
@@ -32,6 +32,7 @@ struct Card {
 
     int lives_add = 0;                  // +Extra lives (0 = no extra lives)
     float block_cooldown_add = 0.0f;    // +Flat decrease to block cooldown
+    float block_duration_add = 0.0f;
 
     // more special effects
     int bullet_bounces_add = 0;                // +Additional bullet bounces (0 = no bounces)
@@ -46,15 +47,20 @@ struct Card {
     float homing_force_add = 0.0f;             // +Homing force applied to bullets
     float poison_damage_percentage_add = 0.0f; // +Percentage of damage converted to poison damage
     float stun_duration_add = 0.0f;            // +Stun duration (0.0f = no stun effect)
+    float thruster_force_add = 0.0f;           // +Thruster force
 
     // Special Effects on Block
     float teleport_distance_on_block_add = 0.0f; // +Teleport distance when blocking (0.0f = no teleport)
     int bombs_on_block_add = 0;                  // +Bombs spawned when blocking (0 = no bombs)
-    float saw_damage_on_block_add = 0.0f;        // +Saw damage when blocking (0.0f = no saw)
+    float saw_damage_add = 0.0f;        // +Saw damage when blocking (0.0f = no saw)
+    float saw_radius_rel_add = 0.0f;        // +Saw damage when blocking (0.0f = no saw)
     float dark_power_charge_time_add = 0.0f;     // +Dark power charge time (0.0f = no dark power)
+    float healing_field_heal_add = 0;
+    float healing_field_radius_rel_add = 0;
+
 
     // Visuals
-    glm::u8vec3 bullet_color = {255, 255, 255};  // =Bullet color (default white)
+    glm::u8vec4 bullet_color = {255, 255, 255, 255};  // =Bullet color (default white)
     bool has_custom_bullet_color = false;        // ?Whether the custom bullet color is active
 
     void printCard() const {
@@ -92,10 +98,9 @@ struct Card {
 
         if (teleport_distance_on_block_add != defaultCard.teleport_distance_on_block_add) std::cout << "  Teleport Distance on Block: " << teleport_distance_on_block_add << "\n";
         if (bombs_on_block_add != defaultCard.bombs_on_block_add) std::cout << "  Bombs on Block Add: " << bombs_on_block_add << "\n";
-        if (saw_damage_on_block_add != defaultCard.saw_damage_on_block_add) std::cout << "  Saw Damage on Block Add: " << saw_damage_on_block_add << "\n";
+        if (saw_damage_add != defaultCard.saw_damage_add) std::cout << "  Saw Damage on Block Add: " << saw_damage_add << "\n";
         if (dark_power_charge_time_add != defaultCard.dark_power_charge_time_add) std::cout << "  Dark Power Charge Time Add: " << dark_power_charge_time_add << "\n";
 
-        std::cout << "Visual Effects:\n";
         if (has_custom_bullet_color) {
             std::cout << "  Bullet Color: (" << (int)bullet_color.r << ", " 
                     << (int)bullet_color.g << ", " << (int)bullet_color.b << ")\n";
@@ -103,7 +108,10 @@ struct Card {
     }
 };
 
-
+DEFINE_CARD(Thruster )
+    .reload_time_add = 0.25f,
+    .thruster_force_add = 7.0f,
+};
 
 DEFINE_CARD(Barrage)
     .damage_mul = 0.3f,
@@ -121,14 +129,16 @@ DEFINE_CARD(Spray)
     .ammo_add = 12,
 };
 
+// TODO
 DEFINE_CARD(Big_bullet)
     .reload_time_add = 0.25f,
+    .bullet_radius_mul = 1.5f,
 };
 
 DEFINE_CARD(Bombs_away)
     .hp_mul = 1.3f,
     .block_cooldown_add = 0.25f,
-    .bombs_on_block_add = 1,
+    .bombs_on_block_add = 3,
 };
 
 DEFINE_CARD(Bouncy)
@@ -145,6 +155,7 @@ DEFINE_CARD(Trickster)
 };
 
 DEFINE_CARD(Brawler)
+    // {Tank}
     // No stat changes yet
 };
 
@@ -265,6 +276,15 @@ DEFINE_CARD(Grow)
 DEFINE_CARD(Healing_field)
     .hp_mul = 1.3f,
     .block_cooldown_add = 0.25f,
+    .healing_field_heal_add = 33,
+    .healing_field_radius_rel_add = 0.75,
+};
+
+DEFINE_CARD(Saw)
+    .hp_mul = 1.3f,
+    .block_cooldown_add = 0.25f,
+    .saw_damage_add = 33,
+    .saw_radius_rel_add = 0.75,
 };
 
 DEFINE_CARD(Homing)
@@ -292,7 +312,14 @@ DEFINE_CARD(Lifestealer)
     .life_steal_percentage_add = 0.5f,
 };
 
+DEFINE_CARD(Tank)
+    .hp_mul = 2.0f,
+    .reload_time_add = 0.5,
+    .shoot_time_mul = 1.25,
+};
+
 const Card cards[] = {
+    Tank,
     Barrage,
     Spray,
     Big_bullet,

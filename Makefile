@@ -31,10 +31,12 @@ srcs := \
 	src/visual.cpp\
 	src/logic.cpp\
 	src/input.cpp\
+	src/particle_system.cpp\
 	src/actors/actor.cpp\
 	src/actors/player.cpp\
 	src/actors/projectile.cpp\
 	src/actors/scenery.cpp\
+	src/actors/field.cpp\
 
 deb_objs := $(patsubst src/%.cpp, obj/deb/%.o, $(srcs))
 rel_objs := $(patsubst src/%.cpp, obj/rel/%.o, $(srcs))

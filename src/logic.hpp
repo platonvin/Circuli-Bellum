@@ -15,6 +15,7 @@ this is where all the parts are glued together
 */
 
 #include "actors/player.hpp"
+#include "actors/field.hpp"
 #include "actors/scenery.hpp"
 #include "actors/projectile.hpp"
 
@@ -24,22 +25,10 @@ enum class SceneState {
     Menu,
 };
 
-//there is no actual reason to draw them separately
-//it potentially saves like 2 bytes, which is nothing
-//and for less than 50k state changes would probably be more harmfull
-//still have to be copied twice tho
-struct Particle{
-    Shape shape;
-    vec2 vel;
-    float lifetime;
-    // float init_radius;
-    void draw(VisualView* view);
-    void update(double dTime);
-};
 
 #include <cstdint>
 #include <functional>
-
+#include "particle_system.hpp"
 
 struct b2BodyIdHash{
     std::size_t operator()(const b2BodyId& bodyId) const noexcept{
@@ -76,24 +65,25 @@ public:
     PhysicalWorld world = {};
     VisualView view = {};
     InputHandler input = {};
-    // for projectiles, it is perfomance requirement. Others are in list for structural coherence
+    // i actually have good ecs implementation, but for experience decided stick to more common "oop"
     List<Player> players = {16};
+    List<Field> fields = {1024};
     List<Scenery> sceneries = {128};
     List<Scenery> borders = {8};
     List<Projectile> projectiles = {1<<16};
 
-    float avg_radius = 0;
-    vector<Particle> particles;
-
     SceneState current_state;
 
-    // why map not vector? Body can have multiple reasons to be deleted in the same tick
-    // i believe engine could be structured to not have such situatuations, but map is not that slow 
+    ParticleSystem particle_system;
+
+    // why set not vector? Body can have multiple reasons to be deleted in the same tick
+    // i believe engine could be structured to not have such situatuations, but set is not that slow 
     // and there is no sequantil load peeks, only random ones
-    // until 1m bullets its probably enough
+    // until 1m bullets its probably good [enough]
     ankerl::unordered_dense::set<b2BodyId, b2BodyIdHash, b2BodyIdEqual> body_garbage;
     // controlled_player
     Player* slave = nullptr;
+    // i have no friend so actual multiplayer cannot be implemented
     Player* bot = nullptr;
 
     vec2 scene_hsize = {1920/float(1080)*10.0, 1*10.0};
@@ -136,16 +126,6 @@ public:
     void genBorderScenery();
 
     void clearWorld(void);
-
-    void addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, float lifetime);
-    void updateDrawParticles();
-    void addEffect(
-        u8vec3 baseColor, u8 colorVariation, 
-        vec2 basePos, float posVariation, 
-        vec2 baseVel, float velVariation, 
-        float baseSize, float sizeVariation, 
-        float baseLifetime, float lifetimeVariation, 
-        int numParticles);
 
     //effect presets. Just shortucts, no logic
     void BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery);

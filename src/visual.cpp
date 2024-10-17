@@ -207,6 +207,8 @@ void VisualView::createPipes(void) {
     createFillerPipes({
         {SolidColor, "shaders/compiled/solid.frag.spv"},
         {RandomColor, "shaders/compiled/random.frag.spv"}, 
+        {HealingFieldStyle, "shaders/compiled/heal.frag.spv"}, 
+        {SawFieldStyle, "shaders/compiled/saw.frag.spv"}, 
         {LEDstyle, "shaders/compiled/led.frag.spv"}, 
         {FBMstyle, "shaders/compiled/fbm.frag.spv"}, 
         {GRIDstyle, "shaders/compiled/grid.frag.spv"}, 
@@ -320,7 +322,7 @@ void VisualView::draw_background(Shape shape, ColoringType type) {
     background = shape;
     background_ct = type;
     //0'st
-    dynamic_shape_vectors[type].push_back(shape);
+    // dynamic_shape_vectors[type].push_back(shape);
     // pl(dynamic_shape_vectors[type].size());
 }
 void VisualView::end_main_pass(void) {
@@ -531,6 +533,8 @@ void VisualView::end_frame(void) {
     frame.move();
     bloomExtracted.move();
     bloomMimapped.move();
+    uniform.move();
+    shadowmap.move();
 }
 
 void VisualView::createShapeBuffers(){
@@ -572,7 +576,14 @@ void VisualView::copyDynamicShapesToGPU(){
             offset += size;
         }
     }
+    VkDeviceSize bg_size = sizeof(Shape);
+    if(bg_size > 0) [[likely]] {
+        background_offset = offset;
+        assert(offset + bg_size <= sizeof(Shape) * max_dynamic_shape_count);
+        memcpy((char*)dynamicShapeBuffer.current().mapped + offset, &background, bg_size);
+        offset += bg_size;
     }
+}
 
 void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> fshaderFiles){
     //so they can be in any order
@@ -583,7 +594,7 @@ void VisualView::createFillerPipes(vector<std::pair<ColoringType, const char*>> 
             {fragmentShaderFile, VK_SHADER_STAGE_FRAGMENT_BIT}
             }).setExtent(render.swapChainExtent).setBlends({BLEND_MIX})
             .setAttributes({
-                {VK_FORMAT_R8G8B8_UINT, offsetof (Shape, coloring_info)},
+                {VK_FORMAT_R8G8B8A8_UINT, offsetof (Shape, coloring_info)},
                 {VK_FORMAT_R8_UINT, offsetof (Shape, shapeType)},
                 {VK_FORMAT_R32G32_SFLOAT, offsetof (Shape, pos)},
                 {VK_FORMAT_R32_SFLOAT, offsetof (Shape, rot_angle)},
@@ -614,26 +625,24 @@ void VisualView::drawShapes() {
     VkDeviceSize dynamicOffset = 0;
     VkCommandBuffer& commandBuffer = graphicsCommandBuffers.current();
     
+    // draw background BEFORE everything else
+    render.cmdBindPipe(commandBuffer, filler_pipes[background_ct]);
+    render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &background_offset);
+    render.cmdDraw(commandBuffer, 6, 1, 0, 0);
+    // draw under other shapes shadows
+    render.cmdBindPipe(commandBuffer, shadowApplyPipe);
+    render.cmdDraw(commandBuffer, 3, 1, 0, 0);
+
     // Draw corresponding shapes for each pair of {coloringType, pipe}
     // Total ColoringType's * 2 drawcalls
-
     for (int coloringType=0; coloringType<COLORING_TYPE_SIZE; coloringType++) {
         render.cmdBindPipe(commandBuffer, filler_pipes[coloringType]);
         int shapes2draw = dynamic_shape_vectors[coloringType].size();
         
+        // if (coloringType == background_ct) {
+        //     shapes2draw--; // cause last [background] already drawn
+        // }
         //crutch but decreases state change
-        if (coloringType == background_ct) {
-            // draw background
-            render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &dynamicOffset);
-            render.cmdDraw(commandBuffer, 6, 1, 0, 0);
-            dynamicOffset += sizeof(Shape);
-            shapes2draw--; // cause [already] drawn here
-            // draw under other shapes shadows
-            render.cmdBindPipe(commandBuffer, shadowApplyPipe);
-            render.cmdDraw(commandBuffer, 3, 1, 0, 0);
-            // rebind old one back
-            render.cmdBindPipe(commandBuffer, filler_pipes[coloringType]);
-        }
         // Draw dynamic shapes
         if (shapes2draw > 0) {
             render.cmdBindVertexBuffers(commandBuffer, 0, 1, &dynamicShapeBuffer.current().buffer, &dynamicOffset);

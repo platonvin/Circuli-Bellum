@@ -1,10 +1,11 @@
+#define GLFW_INCLUDE_NONE
+#define GLM_FORCE_SWIZZLE
 #include <cassert>
 #include <glm/glm.hpp>
 using namespace glm;
 
 // #include "GLFW/glfw3.h"
 // #include "macros.hpp"
-#define GLFW_INCLUDE_NONE
 #include "logic.hpp"
 
 // #define let auto&

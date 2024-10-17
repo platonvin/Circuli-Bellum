@@ -4,6 +4,15 @@
 
 #include "actor.hpp"
 
+struct SceneryState{
+    double durability;
+};
+struct SceneryProps{
+    double durability; //basically hp
+    double contactDamage; //on touch
+    double gravityMultiplier; //when inside. Water?
+};
+
 class Scenery {
 public:
     //first for custom rtti :)

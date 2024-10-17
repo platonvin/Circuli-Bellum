@@ -3,7 +3,7 @@
 // shape is constructed in fragment, vertex only creates bounding box
 // this is to decrease state chagnes and improve quality by smoothing
 
-layout(location = 0) in uvec3 coloring_info;
+layout(location = 0) in uvec4 coloring_info;
 layout(location = 1) in uint shape_type;
 layout(location = 2) in vec2 global_pos;
 // layout(location = 3) in vec2 rotation;

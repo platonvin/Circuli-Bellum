@@ -5,6 +5,24 @@
 
 #include "actor.hpp"
 // #include <functional>
+class Player;
+class Scenery;
+
+struct ProjectileState {
+    double damage = 0;
+    double radius = 0;
+    int bounces_left =1;
+};
+struct ProjectileProps{
+    float damage = 0;
+    float radius = 1.0;
+    int max_bounces = 1;
+    float extra_damage_per_bounce = 0; // Trickster thing. Increase damage on bounce
+    float bounciness = 0.9; // physicsal property
+    float grow_factor = 0; // multiplier per second. if 10, then damage *= 11 every second
+    float thruster_force = 0.0f; // Force of thrust rocket. does NOT scale with mass
+};
+
 
 struct Projectile {
 public:
@@ -18,21 +36,23 @@ public:
     Projectile(double damage, float radius) : 
         actor(ActorType::Projectile, b2_dynamicBody, Circle, \
             twpp::pink(700), vec2(0), {.CIRCLE_radius = radius}),
-        state{.damage=damage, .radius=radius},
-        props{.damage=float(damage), .radius=radius} {}
+        state{.damage=damage, .radius=radius}
+        // ,props{.damage=float(damage), .radius=radius} 
+        {}
 
-    void setupFromPlayer(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor);
+    void setupFromPlayer(Player* player);
 
     void update(PhysicalWorld* world /*for later?*/, float dTime);
     void updateTrailData();
     void drawTrail(VisualView* view);
     void addToWorld(PhysicalWorld* world, int group = 0);
     //return false if destroy
-    bool processSceneryHit(SceneryState* scenery);
-    bool processPlayerHit(PlayerState* player);
+    bool processSceneryHit(Scenery* scenery);
+    bool processPlayerHit(Player* player);
 
     struct ProjectileState state;
-    struct ProjectileProps props;
+    // struct ProjectileProps props;
+    Player* master;
     
     Shape constructShape();
     void draw(VisualView* view);

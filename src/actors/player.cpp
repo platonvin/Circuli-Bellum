@@ -1,4 +1,7 @@
 #include "player.hpp"
+#include "actors/field.hpp"
+#include "actors/projectile.hpp"
+#include "logic.hpp"
 
 #define DRAW_IF_DEBUG(_shape) if(debugView) debugView->draw_dynamic_shape(_shape, SolidColor)
 
@@ -9,24 +12,44 @@ void Player::processDamage(float damage) {
     if(state.hp_left < 0){
        // death anim? TODO: 
         state.lives_left--;
+        state.hp_left = props.max_hp;
     }
     if(state.lives_left < 0){
        // final death? TODO?
     }
 }
+void Player::processHeal(float heal) {
+    // pl(damage)
+    state.hp_left += heal;
+    state.hp_left = glm::min(state.hp_left, props.max_hp);
+}
+
 void Player::processBorderTouch(PhysicalWorld* world, vec2 normal) {
     // vec2 impulse = {0, +50};
     vec2 impulse = 10.f*normal;
     world->applyImpulse(actor.bindings.body, glm2b(impulse));
     world->applyImpulse(leg.bindings.body, glm2b(impulse));
-    processDamage(60);
+    processDamage(42);
 }
 
-void Player::processBulletHit(PhysicalWorld* world, ProjectileState* projectile){
-    float damage = projectile->damage;
-    processDamage(damage);
-    // world->applyImpulse(actor.bindings.body, b2Vec2());
-    //block?
+void Player::processBulletHit(PhysicalWorld* world, Projectile* projectile){
+    if(not blocking()){
+        float damage = projectile->state.damage;
+        processDamage(damage);
+        // world->applyImpulse(actor.bindings.body, b2Vec2());
+        //block?
+
+        //if bullet had thrusters, make player thruster-positive
+        if(projectile->master->props.thruster_force != 0.f){
+            Thruster thruster = {};
+                thruster.dir = normalize(projectile->actor.state.vel);
+                thruster.time_left = 3.5;
+                thruster.hlen = log(projectile->master->props.thruster_force+1.0)/10.0;
+                thruster.force = projectile->master->props.thruster_force;
+
+            thrusters.push_back(thruster);
+        }
+    }
 }
 
 
@@ -35,6 +58,7 @@ Shape Player::constructShape(){
         shape.shapeType = Circle;
         shape.props.CIRCLE_radius = props.radius;
         // shape.rounding_radius = props.radius/2.0;
+        shape.coloring_info.w = 255;
         //overwrites
         shape.pos = visual_pos;
     return shape;
@@ -96,11 +120,19 @@ void Player::updateGun(float dTime) {
     }
 }
 
+void Player::updateBlock(float dTime) {
+    state.block_time_left -= dTime;
+    //reload block if not in block
+    if(not blocking()){
+        state.time_since_last_block += dTime;
+    }
+}
+
 void Player::updateHpBar(float dTime) {
     const float HP_DECAY_TIME = 0.15f;
     hp_bar.current_ratio = glm::mix(
         hp_bar.current_ratio,
-        float(state.hp_left / props.hp),
+        float(state.hp_left / props.max_hp),
         glm::clamp(dTime, 0.f, HP_DECAY_TIME)/HP_DECAY_TIME
     );
 }
@@ -110,8 +142,9 @@ void Player::update(PhysicalWorld* world, float dTime /*for later?*/, vec2 view_
     refillJumpsIfNeeded(dTime);
     updateGun(dTime);
     updateLegPositions(world);
-    updateThrusters(dTime);
+    updateThrusters(world, dTime);
     updateHpBar(dTime);
+    updateBlock(dTime);
     // TODO: better jump
     // if(actor.state.vel.y > -0.01){
     //     b2Body_SetGravityScale(actor.bindings.body, 2.0);
@@ -124,7 +157,7 @@ void Player::update(PhysicalWorld* world, float dTime /*for later?*/, vec2 view_
     state.aim_direction = normalize(view_pos - actor.state.pos);
 }
 
-void Player::updateThrusters(float dTime){
+void Player::updateThrusters(PhysicalWorld* world, float dTime){
     int write_index = 0;
     for (int i = 0; i < thrusters.size(); i++) {
         Thruster& thruster = thrusters[i];
@@ -133,11 +166,13 @@ void Player::updateThrusters(float dTime){
         if (thruster.time_left > 0) {
             thruster.time_left -= dTime;
 
+            world->applyForce(actor.bindings.body, 
+                glm2b(thruster.force*thruster.dir));
             // keep this thruster
             thrusters[write_index] = thruster;
             write_index++;
         }
-    }
+    } thrusters.resize(write_index);
 }
 
 void Player::addToWorld(PhysicalWorld* world){
@@ -196,15 +231,18 @@ void Player::addToWorld(PhysicalWorld* world){
 static VisualView* debugView = nullptr;
 
 // Well, im not an artist, so i draw stuff with programatically
-void Player::draw(VisualView* view) {
+void Player::draw(VisualView* view, ParticleSystem* psys, float dTime) {
     // updateLegPositions()
     // pl(int(actor.properties.color.x))
+    drawBlock(view);
     drawBody(view);
     drawEyes(view);
     drawArmsAndGun(view);
     drawLegs(view);
 
     drawHpBar(view);
+
+    drawThrusters(view, psys, dTime);
 
     Shape shape = {};
         shape.coloring_info = twpp::lime(600);
@@ -279,7 +317,7 @@ void Player::updateLegPositions(PhysicalWorld* world) {
     // If any of candidates is far enough
     // then make a step
     if(closest_frac != 10){
-        vec2 new_left_leg_pos = closest_point;
+        vec2 new_left_leg_pos = closest_point + vec2(x_shift,0);
         if(glm::distance(new_left_leg_pos, real_left_leg_pos) > props.radius/0.5){
             real_left_leg_pos = new_left_leg_pos;
         }
@@ -311,7 +349,7 @@ void Player::updateLegPositions(PhysicalWorld* world) {
     }
     
     if(closest_frac != 10){
-        vec2 new_right_leg_pos = closest_point;
+        vec2 new_right_leg_pos = closest_point + vec2(x_shift,0);
         if(glm::distance(new_right_leg_pos, real_right_leg_pos) > props.radius/0.5){
             real_right_leg_pos = new_right_leg_pos;
         }
@@ -320,11 +358,29 @@ void Player::updateLegPositions(PhysicalWorld* world) {
     smooth_left_leg_pos = mix(smooth_left_leg_pos, real_left_leg_pos, 0.8);
     smooth_right_leg_pos = mix(smooth_right_leg_pos, real_right_leg_pos, 0.8);
 }
+void Player::drawBlock(VisualView* view) {
+    //start with same as body
+    Shape block = constructShape();
+
+    //smooth transition in / out
+    float block_stability = 
+        (state.block_time_left < props.block_duration/2.0) ?
+        (state.block_time_left) : 
+        (props.block_duration - state.block_time_left);
+    block_stability = block_stability / props.block_duration;
+    block_stability = glm::pow(block_stability, 1/5.0);
+        block.props.CAPSULE_radius *= 1.07;
+        block.coloring_info = twpp::slate(50);
+        //smooth transition in / out
+        block.coloring_info = vec4(block.coloring_info)*block_stability;
+    if(blocking()){
+        view->draw_dynamic_shape(block, SolidColor);
+    }
+}
 void Player::drawBody(VisualView* view) {
     debugView = view;
     view->draw_dynamic_shape(constructShape(), SolidColor);
 }
-
 void Player::drawLegs(VisualView* view) {
     const float legRadius = props.radius * 0.05f;
     const float legLength = props.radius * 0.5f;
@@ -411,10 +467,13 @@ void Player::drawLegs(VisualView* view) {
     view->draw_dynamic_shape(rightLowerLeg, SolidColor);
 }
 
-void Player::drawThrusters(VisualView* view) {
-    for (const Thruster& thruster : thrusters) {
-        const  vec2 player_contact = visual_pos + props.radius * thruster.dir;
-        const  vec2 center = player_contact + thruster.hlen * thruster.dir;
+float randFloat(float min, float max);
+
+void Player::drawThrusters(VisualView* view, ParticleSystem* psys, float dTime) {
+    for (mut thruster : thrusters) {
+        const  vec2 player_contact = visual_pos - props.radius * thruster.dir;
+        const  vec2 center = player_contact - thruster.hlen * thruster.dir;
+        const  vec2 end = player_contact - thruster.hlen * thruster.dir * 2.0f;
         const float rot_angle = -glm::atan(thruster.dir.y, thruster.dir.x);
 
         // main gray capsule
@@ -428,20 +487,50 @@ void Player::drawThrusters(VisualView* view) {
         view->draw_dynamic_shape(shape, SolidColor);
 
         // inside glowing thing
-        shape = {};
-            shape.shapeType = Capsule;
-            shape.pos = center;
-            shape.rot_angle = rot_angle;
-            shape.props.CAPSULE_half_length = thruster.hlen;
-            shape.props.CAPSULE_radius = thruster.hlen * 0.8;
-            shape.coloring_info = twpp::gray(600);
+        //TODO display lifetime here
+            shape.props.CAPSULE_half_length *= 0.8;
+            shape.props.CAPSULE_radius *= 0.3;
+            shape.coloring_info = twpp::amber(300);
         view->draw_dynamic_shape(shape, SolidColor);
 
-        // vec2 trailPos = visual_pos;
+        float H = thruster.hlen;
+        const float THRUSTER_PARTICLES_PER_SECOND = 30;
+        float particle_chance = dTime * THRUSTER_PARTICLES_PER_SECOND;
+        float rnd = randFloat(0,1);
+        if(rnd < particle_chance){
+            psys->addEffect(
+                twpp::amber(100),        // Base color
+                4,                      // Color variation
+                end,                    // Base position
+                H/10.0,                 // Position variation
+                - thruster.dir * H*10.5f,  // Base velocity
+                H*1.0,                  // Velocity variation
+                H*0.8,                  // Base size
+                H*0.45,                 // Size variation
+                0.5,                    // Base lifetime
+                0.1,                    // Lifetime variation
+                1                       // Number of particles
+            );
+            psys->addEffect(
+                twpp::yellow(200),      // Base color
+                5,                      // Color variation
+                end,                    // Base position
+                H/10.0,                 // Position variation
+                - thruster.dir * H*10.5f,  // Base velocity
+                H*1.0,                  // Velocity variation
+                H*0.8,                  // Base size
+                H*0.45,                 // Size variation
+                0.5,                    // Base lifetime
+                0.1,                    // Lifetime variation
+                1                       // Number of particles
+            );
+            thruster.spawned_particles++;
+        }
+            // vec2 trailPos = visual_pos;
             // vec2 trailVel = -thruster.dir * 50.0f;
 
             // scene->addEffect(
-            //     u8vec3(255, 200, 50),  // Base color: yellowish for fire trail
+            //     u8vec4(255, 200, 50),  // Base color: yellowish for fire trail
             //     20,                    // Color variation
             //     trailPos, 3.0f,        // Particle spawn position variation
             //     trailVel, 10.0f,       // Velocity with slight variation
@@ -536,8 +625,8 @@ void Player::drawArmsAndGun(VisualView* view) {
     drawBarrel(view, mirrorPosition(visual_pos, barrelPos), barrelLength, barrelWidth, mirrorRotation(rotAngle));
 
         vec2 ammoStartPos = rotatePosition(vec2(props.radius * 0.8f + magazineHeight / 2.0f, magazineHeight / 2.0f));
-
-    drawAmmo(view, mirrorPosition(visual_pos, ammoStartPos), ammoSize, bulletsPerRow, state.ammunition_left, rawAimDir, perpDir, rotAngle, isMirrored);
+    drawAmmo(view, mirrorPosition(visual_pos, ammoStartPos), ammoSize, bulletsPerRow, state.ammunition_left, 
+        rawAimDir, mirrorPosition(vec2(0), perpDir), mirrorRotation(rotAngle), isMirrored);
 
     // at the end of the gun
     float shotDelaySize = props.radius * 0.3f;
@@ -550,8 +639,60 @@ void Player::drawArmsAndGun(VisualView* view) {
     float reloadDelayFill = state.time_since_last_reload / props.reload_duration;
     vec2 reloadDelayPos = mirrorPosition(visual_pos, magazinePos + perpDir * (barrelLength / 2.0f)); 
     drawReloadDelay(view, reloadDelayPos, reloadDelayFill, reloadDelaySize);
-}
 
+    drawBlockArm(view, isMirrored);
+}
+void Player::drawBlockArm(VisualView* view, bool isMirrored) {
+    const float R = props.radius;
+    const float capsuleRadius = R * 0.12f;
+    const float upperLength = R * 0.4f;
+    const float lowerLength = R * 0.69f;
+    const float handRadius = R * 0.45f;
+    const float secondHandRadius = R * 0.35f;
+    
+    vec2 dir = vec2(0);
+    dir.x = (state.aim_direction.x > 0) ? -1 : +1;
+    vec2 upperArmDir = glm::normalize(dir += vec2(0, -visual_vel.y / 50.0f - 0.4f));
+
+    vec2 shoulderPos = visual_pos + glm::normalize(dir += vec2(0, 0.14f)) * R;
+
+    Shape upperArm;
+        upperArm.coloring_info = twpp::gray(800);
+        upperArm.pos = shoulderPos + upperArmDir * upperLength / 2.0f;
+        upperArm.shapeType = Capsule;
+        upperArm.props.CAPSULE_half_length = upperLength / 2.0f;
+        upperArm.props.CAPSULE_radius = capsuleRadius;
+        upperArm.rot_angle = -glm::atan(upperArmDir.y, upperArmDir.x);
+    view->draw_dynamic_shape(upperArm, SolidColor);
+
+    vec2 upperArmEndPos = shoulderPos + upperArmDir * upperLength;
+
+    vec2 lowerArmDir = glm::normalize(upperArmDir + vec2(0, +0.8f)); 
+
+    Shape lowerArm;
+        lowerArm.coloring_info = twpp::gray(800);
+        lowerArm.pos = upperArmEndPos + lowerArmDir * lowerLength / 2.0f;
+        lowerArm.shapeType = Capsule;
+        lowerArm.props.CAPSULE_half_length = lowerLength / 2.0f;
+        lowerArm.props.CAPSULE_radius = capsuleRadius;
+        lowerArm.rot_angle = -glm::atan(lowerArmDir.y, lowerArmDir.x);
+    view->draw_dynamic_shape(lowerArm, SolidColor);
+
+    vec2 lowerArmEndPos = upperArmEndPos + lowerArmDir * lowerLength;
+
+    float fill = state.time_since_last_block / props.block_cooldown;
+    Shape reloadHand;
+        reloadHand.coloring_info = twpp::gray(700);
+        reloadHand.pos = lowerArmEndPos; 
+        reloadHand.shapeType = Circle;
+        reloadHand.props.CIRCLE_radius = secondHandRadius;
+        reloadHand.rounding_radius = fill * secondHandRadius;
+        if(state.block_time_left > 0){
+            reloadHand.coloring_info = twpp::slate(200);
+            reloadHand.rounding_radius = 1.0 * secondHandRadius;
+        }
+    view->draw_dynamic_shape(reloadHand, SolidColor);
+}
 void Player::drawShotDelay(VisualView* view, vec2 pos, float fill, float size){
     Shape shape;
         shape.coloring_info = twpp::gray(600);
@@ -630,7 +771,7 @@ void Player::drawAmmo(VisualView* view, vec2 ammoStartPos, float ammoSize, int b
 }
 
 void Player::drawCard(const Card* card) {
-    props.hp *= card->hp_mul;
+    props.max_hp *= card->hp_mul;
     props.mass = 1.0f;
     // props.radius *= ???? TODO compute from mass;
     props.bullet_radius *= card->bullet_radius_mul;
@@ -653,26 +794,37 @@ void Player::drawCard(const Card* card) {
     props.extra_damage_per_bounce += card->bullet_bounce_damage_add;
     props.grow_factor += card->grow_factor_add;
     props.hit_knockback += card->knockback_add;
+    props.thruster_force += card->thruster_force_add;
+    props.block_cooldown += card->block_cooldown_add;
+    props.block_duration += card->block_duration_add;
+    props.life_steal_percentage += card->life_steal_percentage_add;
+    
+    props.healing_field_heal += card->healing_field_heal_add;
+    props.healing_field_radius_rel += card->healing_field_radius_rel_add;
 
+    props.saw_damage += card->saw_damage_add;
+    props.saw_radius_rel += card->saw_radius_rel_add;
+    
     //constrains
     props.bullet_radius = glm::clamp(props.bullet_radius, 0.01f, 2.f);
-    props.hp = glm::max(props.hp, 50.0);
+    props.max_hp = glm::max(props.max_hp, 50.0);
     props.spread = glm::clamp(props.spread, 0.01f, .495f);
     props.bullet_damage = glm::max(props.bullet_damage, 1.0);
     props.shot_delay = glm::clamp(props.shot_delay, 0.005, 60.0);
+    props.life_steal_percentage = glm::clamp(props.life_steal_percentage, -1.0f, +0.9f);
     // props.bullet_bounces = glm::clamp(props.bullet_bounces, 0.f, .99f);
 
     cards.push_back(card);
 }
 
-ProjectileProps Player::createBullet(){
-    ProjectileProps _props = {};
-        _props.damage = props.bullet_damage;
-        _props.extra_damage_per_bounce = props.extra_damage_per_bounce;
-        _props.bounciness = .9;
-        _props.radius = props.bullet_radius;
-    return _props;
-}
+// ProjectileProps Player::createBullet(){
+//     ProjectileProps _props = {};
+//         _props.damage = props.bullet_damage;
+//         _props.extra_damage_per_bounce = props.extra_damage_per_bounce;
+//         _props.bounciness = .9;
+//         _props.radius = props.bullet_radius;
+//     return _props;
+// }
 
 // damper for better visuals. Breaks on high frame times. Causes AaAaAa in the beginning
 void Player::updateVisualPos(float dTime) {
@@ -691,7 +843,7 @@ void Player::resetState() {
     state.jumps_left = props.max_jumps;
     state.touching_grass_counter = 0;
     state.refill_body_jumps_next_frame = false;
-    state.hp_left = props.hp;
+    state.hp_left = props.max_hp;
     state.aim_direction = vec2(0);
     state.damage = props.bullet_damage;
     state.time_since_last_reload = +INFINITY;
@@ -705,9 +857,11 @@ void Player::resetState() {
     b2Body_SetTransform(leg.bindings.body, {}, {1, 0});
     b2Body_SetLinearVelocity(actor.bindings.body, {});
     b2Body_SetLinearVelocity(leg.bindings.body, {});
+
+    thrusters.clear();
 }
 
-void Player::processJump(PhysicalWorld* world) {
+bool Player::tryJump(PhysicalWorld* world) {
     if(state.jumps_left > 0){
         // npl("JUMP");
         vec2 old_vel = world->getVelocity(actor.bindings.body);
@@ -728,9 +882,28 @@ void Player::processJump(PhysicalWorld* world) {
         //so not updated from previous
         state.refill_body_jumps_next_frame = false;
         // state.refill_leg_jumps_next_frame = false;
+        return true;
     }
+    return false;
 }
 
+bool Player::tryBlock() {
+    //if not in block
+    if(state.block_time_left <= 0) {
+        //and block reloaded
+        if(state.time_since_last_block >= props.block_cooldown){
+            state.block_time_left = props.block_duration;
+            state.time_since_last_block = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
+void Player::processField(Field* field, float multiplier){
+    processHeal(field->state.heal * multiplier);
+    processDamage(field->state.damage * multiplier);
+}
 
 void Player::drawHpBar(VisualView* view) {
     float barWidth = props.radius*2.7;
@@ -738,7 +911,7 @@ void Player::drawHpBar(VisualView* view) {
     float barYOffset = props.radius - 0.01;
     vec2 barPosition = visual_pos + vec2(0, props.radius + barYOffset);
 
-    double maxHP = props.hp;
+    double maxHP = props.max_hp;
     double currentHP = state.hp_left;
 
     float filledBarWidth = float(hp_bar.current_ratio * barWidth);
@@ -759,4 +932,8 @@ void Player::drawHpBar(VisualView* view) {
 
     view->draw_dynamic_shape(barBack, SolidColor);
     view->draw_dynamic_shape(barFill, SolidColor);
+}
+
+bool Player::blocking(){
+    return (state.block_time_left >= 0);
 }

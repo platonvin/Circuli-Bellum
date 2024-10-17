@@ -25,3 +25,10 @@ client_deb
 /box2d/obj
 /todo.md
 /how i render ROUNDS.txt
+/src/algo.hpp
+/slmb.txt
+/src/data_structures/ecs.hpp
+/shaders/radial_temp.frag
+/shaders/radial_wavy.frag
+/shaders/radial_seg.frag
+/shaders/radial_sticks.frag

@@ -4,6 +4,7 @@
 #define __VISUAL_HPP__
 
 // #define GLFW_INCLUDE_NONE
+#define GLM_FORCE_SWIZZLE
 #include "al.hpp"
 
 typedef struct Camera {
@@ -21,6 +22,8 @@ enum ShapeType : unsigned char{
 
 //TODO state change is neccessary? or depth? 
 enum ColoringType : unsigned char{
+    HealingFieldStyle, 
+    SawFieldStyle, 
     WAVYstyle,
     SolidColor,
     RandomColor,
@@ -55,7 +58,7 @@ typedef union ShapeProps {
 } ShapeProps;
 
 typedef struct Shape {
-    u8vec3 coloring_info; // Solid color AND anything else for non-solid-color coloringType
+    u8vec4 coloring_info; // Solid color AND anything else for non-solid-color coloringType
     ShapeType shapeType;
     vec2 pos;
     // vec2 rot = vec2(1,0);
@@ -84,6 +87,7 @@ public:
 
     Shape background;
     ColoringType background_ct;
+    VkDeviceSize background_offset;
 
     Camera camera = {};
     struct {
@@ -131,7 +135,7 @@ public:
     void end_frame();
 
     ring<Buffer> shadowShapeBuffer;
-    ring<Buffer> dynamicShapeBuffer;
+    ring<Buffer> dynamicShapeBuffer; // last elem is background
 
     //subpass of main
     RasterPipe bloomExtractPipe;
@@ -210,10 +214,11 @@ public:
             render.destroyRasterPipeline(&frp);
         }
         render.destroyRasterPipeline(&bloomApplyPipe);
-        render.destroyRasterPipeline(&shadowPipe);
         render.destroyRasterPipeline(&bloomExtractPipe);
         render.destroyComputePipeline(&bloomDownsamplePipe);
         render.destroyComputePipeline(&bloomUpsamplePipe);
+        render.destroyRasterPipeline(&shadowPipe);
+        render.destroyRasterPipeline(&shadowApplyPipe);
         // render.destroyRasterPipeline(&bloomPipe);
         vkDestroyDescriptorSetLayout(render.device, bloomDownsamplePushLayout, NULL);
         vkDestroyDescriptorSetLayout(render.device, bloomUpsamplePushLayout, NULL);

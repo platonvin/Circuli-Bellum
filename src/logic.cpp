@@ -102,17 +102,51 @@ int LogicalScene::countActivePlayers() {
 }
 
 void LogicalScene::endRound(){
-    int id = rand() % std::size(cards);
-    cards[id].printCard();
 }
 
 // there is no choise. DRAW A CARD
 void LogicalScene::giveCardsToDeadPlayers(){
-    for(mut p : players){
-        int id = rand() % std::size(cards);
+    for(mut p : players) {
         if(p.state.lives_left == 0){
-            p.drawCard(&cards[id]);
-            cards[id].printCard();
+            if(&p == slave){
+                // = minimize
+                glfwIconifyWindow(view.render.window.pointer);
+                    std::cout << "CHOOSE A CARD (type id in terminal)\n";
+
+                    std::array<const Card*, 5> choise = {0};
+                    for(int i=0; i<choise.size(); i++){
+                        const Card* card;
+                        label_pick_a_card_for_choise:
+                            card = &cards[rand() % std::size(cards)];
+                        if (std::find_if(choise.begin(), choise.end(), [card](const Card* cp) {return cp==card;}) != choise.end()) 
+                            goto label_pick_a_card_for_choise;
+                        choise[i] = card;
+                        std::cout << "ID: " << i+1 << " "; 
+                        choise[i]->printCard();
+                    }
+                    int id;
+                    label_try_input:
+                        std::cin >> id;
+                        if (std::cin.fail()) {
+                            std::cin.clear();
+                            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                            std::cout << "invalid card id\n";
+                            goto label_try_input;
+                        }
+                        if(id < 1 || id > choise.size()+1) {
+                            std::cout << "invalid card id";
+                            goto label_try_input;
+                        }
+                    p.drawCard(choise[id-1]);
+                    choise[id-1]->printCard();
+                    std::cout << "\n";
+                glfwRestoreWindow(view.render.window.pointer);                
+            } else {
+                int id = rand() % std::size(cards);
+                p.drawCard(&cards[id]);
+                std::cout << "bot ";
+                cards[id].printCard();
+            }
         }
     }
 }
@@ -184,9 +218,8 @@ void LogicalScene::setupActionCallbacks() {
     // input.rebindKey(Action::Jump, GLFW_KEY_SPACE);
     input.setActionCallback(Action::Jump, 
         [this](Action action) -> void {
-            PlayerJumpEffect(slave);
-            slave->processJump(&world);
-            earth_shake+=5.1;
+            bool jumped = slave->tryJump(&world);
+            if(jumped) PlayerJumpEffect(slave);
         }
     );
 
@@ -202,7 +235,7 @@ void LogicalScene::setupActionCallbacks() {
                     // Player* p = players._start->obj();
                     Projectile bullet = {};
                         // bullet.props = slave->createBullet();
-                    bullet.setupFromPlayer(&slave->state, &slave->props, &slave->actor);
+                    bullet.setupFromPlayer(slave);
                     if(slave->props.bullets_per_shot > 1){
                         addProjectilesPack(bullet, slave->props.bullets_per_shot, slave->props.bullet_speed*slave->props.spread);
                     } else {
@@ -219,9 +252,16 @@ void LogicalScene::setupActionCallbacks() {
             // int id = rand() % std::size(cards);
             // slave->drawCard(&cards[id]);
             // cards[id].printCard();
-            (rand()%3!=0) ? slave->drawCard(&Spray) : slave->drawCard(&Buckshot);
-            (rand()%5==0) ? slave->drawCard(&Fastball) : (void());
-            slave->drawCard(&Trickster);
+            // (rand()%3!=0) ? slave->drawCard(&Spray) : slave->drawCard(&Buckshot);
+            // (rand()%5==0) ? slave->drawCard(&Fastball) : (void());
+            slave->drawCard(&Healing_field);
+            // slave->drawCard(&Saw);
+        }
+    );
+    input.setActionCallback(Action::Block, 
+        [this](Action action) -> void {
+            bool blocked = slave->tryBlock();
+            if(blocked) setupFieldsFromPlayer(&fields, slave);
         }
     );
     input.setActionCallback(Action::MoveLeft, 
@@ -288,12 +328,16 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
             case (ActorType::Player | ActorType::StaticScenery): {
                 Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
                 player->state.touching_grass_counter++;
+                // earth_shake += 5.0 * glm::sign(player->actor.state.vel.x);
                 break;
             }
             case (ActorType::PlayerLeg | ActorType::StaticScenery): {
                 Player* player = (Player*)(
                     ((typeA == ActorType::PlayerLeg) ? (char*)(udataA) : (char*)(udataB)) - offsetof(Player, leg) + offsetof(Player, actor));
                 player->state.touching_grass_counter++;
+                //just shiny relation
+                earth_shake += sqrtf(glm::max(abs(player->actor.state.vel.y)-15.f, 0.0f)) * glm::sign(player->actor.state.vel.x);
+                // earth_shake += sqrtf(abs(player->actor.state.vel.y)) * glm::sign(player->actor.state.vel.x);
                 break;
             }
             case (ActorType::Player | ActorType::Border): {
@@ -312,7 +356,7 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 Scenery* scenery = (typeA == ActorType::StaticScenery) ? (Scenery*)(udataA) : (Scenery*)(udataB);
                 //possibly damage scenery, bounce/kill bullet
                 BulletSceneryHitEffect(projectile, scenery);
-                bool survived = projectile->processSceneryHit(&scenery->state);
+                bool survived = projectile->processSceneryHit(scenery);
                 if(!survived){
                     body_garbage.insert(projectile->actor.bindings.body);
                     projectiles.softRemoveElem((ListElem<Projectile>*)projectile);
@@ -324,8 +368,8 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 //TODO:
                 Projectile* projectileA = (Projectile*)(udataA);
                 Projectile* projectileB = (Projectile*)(udataB);
-
-                if((projectileA->time_elapsed > 0) && (projectileB->time_elapsed > 0)){
+                
+                if((projectileA->time_elapsed > 0.001) && (projectileB->time_elapsed > 0.001)){
                     body_garbage.insert(projectileA->actor.bindings.body);
                     body_garbage.insert(projectileB->actor.bindings.body);
                     projectiles.softRemoveElem((ListElem<Projectile>*)projectileA);
@@ -337,14 +381,14 @@ void LogicalScene::processBeginEvents(b2ContactEvents contacts){
                 Projectile* projectile = (typeA == ActorType::Projectile) ? (Projectile*)(udataA) : (Projectile*)(udataB);
                 Player* player = (typeA == ActorType::Player) ? (Player*)(udataA) : (Player*)(udataB);
 
-                bool survived = projectile->processPlayerHit(&player->state);
+                bool survived = projectile->processPlayerHit(player);
                 if(!survived){
                     body_garbage.insert(projectile->actor.bindings.body);
                     // body_garbage_annotations.push_back("c:\\prog\\Circuli Bellum\\src\\logic.cpp: 312");
                     projectiles.softRemoveElem((ListElem<Projectile>*)projectile);
                     BulletPlayerHitEffect(projectile, player);
                 }
-                    player->processBulletHit(&world, &projectile->state);
+                    player->processBulletHit(&world, projectile);
                     vec2 impulse = 
                         normalize(projectile->actor.state.vel) * player->props.hit_knockback;
                     world.applyImpulse(player->actor.bindings.body, glm2b(impulse));
@@ -469,6 +513,7 @@ void LogicalScene::processMoveEvents(b2BodyEvents moves, double dTime){
 
 void LogicalScene::tick(double dTime) {
     input.pollUpdates();
+    dTime = glm::clamp(dTime, 0.0, 0.2);
     
     //here for debug draw
     view.start_frame();
@@ -481,7 +526,15 @@ void LogicalScene::tick(double dTime) {
         // view.draw_dynamic_shape(background, WAVYstyle);
         view.draw_background(background, WAVYstyle);
         
+        
     if(!glfwGetKey(view.render.window.pointer, GLFW_KEY_RIGHT_SHIFT)){
+        for(mut f : fields){
+            bool ended = f.update(&world, &players, dTime);
+            if (ended){
+                fields.removeElem((ListElem<Field>*)&f);
+            }
+        }
+
         world.step(dTime);
         b2BodyEvents bodyEvents = world.GetBodyEvents();
         b2ContactEvents contacts = world.GetContactEvents();
@@ -513,39 +566,7 @@ void LogicalScene::tick(double dTime) {
             b2DestroyBody(bg);
         } body_garbage.clear();
 
-        //soft limit
-        const float TARGET_PARTICLE_COUNT = 10000; //maybe thats too little
-        // const float    MAX_PARTICLE_COUNT = 100; //maybe thats too little
-        //higher bias -> particles removed earlier  
-        float current_bias = 0.006;
-        if(particles.size() > TARGET_PARTICLE_COUNT){
-            float ratio = particles.size() / TARGET_PARTICLE_COUNT; //>1
-            //square for aggressive clamping
-            //TODO: clamp particle count?
-            current_bias = current_bias * ratio*ratio;
-        }
-        // avg_radius = 0;
-
-        // pl(current_bias)
-        // pl(particles.size())
-        
-        // Basically processes and removes dead ones
-        int write_index = 0;
-        for (int i = 0; i < particles.size(); i++) {
-            //TODO:
-            // bool should_keep = particles[i].shape.props.CIRCLE_radius > 0.001;
-            bool should_keep = particles[i].shape.props.CIRCLE_radius > current_bias; // TODO until visible
-            // avg_radius += particles[i].shape.props.CIRCLE_radius;
-            if (should_keep) {
-                particles[write_index] = particles[i];
-                particles[write_index].shape.pos += particles[write_index].vel * float(dTime);
-                // particles[write_index].lifetime -= dTime; // if enabled, then dTime/(0 /-value) might happen
-                particles[write_index].shape.props.CIRCLE_radius *= exp(-dTime/particles[write_index].lifetime);
-                write_index++;
-            }
-        }
-        // avg_radius /= float(write_index);
-        particles.resize (write_index);
+        particle_system.update(dTime);
 
         int activePlayers = countActivePlayers();
         if(activePlayers < 2) {
@@ -566,7 +587,12 @@ void LogicalScene::tick(double dTime) {
     view.camera.cameraScale = {scene_hsize.x, -scene_hsize.y};
     view.ubo_cpu.chrom_abb = 1.f * vec2(chromatic_abb) / vec2(view.ubo_cpu.res);
     view.ubo_cpu.light_pos = vec2(0,12) + light_pendulum.get_pendulum_position2();
-    light_pendulum.apply_impulse(earth_shake, 0);
+    // light_pendulum.apply_impulse(earth_shake, 0);
+    // light_pendulum.apply_impulse(earth_shake/2.0, earth_shake);
+    // pl(earth_shake);
+    // if(earth_shake)
+        // earth_shake = 500;
+    light_pendulum.apply_impulse(earth_shake/1.0, earth_shake/2.0);
     earth_shake=0;
     light_pendulum.simulate(dTime);
     
@@ -576,7 +602,10 @@ void LogicalScene::tick(double dTime) {
     for(mut b : borders){
         b.draw(&view, FBMstyle);
     }
-    for(mut p : particles){
+    for(mut f : fields){
+        f.draw(&view);
+    }
+    for(mut p : particle_system.particles){
         p.draw(&view);
     }
     for(mut s : sceneries){
@@ -586,7 +615,7 @@ void LogicalScene::tick(double dTime) {
         p.draw(&view);
     }
     for(mut p : players){
-        p.draw(&view);
+        p.draw(&view, &particle_system, dTime);
     }
 
     view.end_main_pass();
@@ -602,62 +631,11 @@ void LogicalScene::startNewRound(){
     resetPlayersState();
 }
 
-void LogicalScene::addParticle(u8vec3 color, vec2 pos, vec2 vel, float size, float lifetime){
-    //TODO vel?
-    Particle p = {};
-        p.shape.coloring_info = color;
-        p.shape.shapeType = Circle;
-        p.shape.props = {.CIRCLE_radius = size};
-        p.shape.pos = pos;
-        p.vel = vel;
-    p.lifetime = lifetime;
-
-    particles.push_back(p);
-}
-
-void LogicalScene::addEffect(
-    u8vec3 baseColor, u8 colorVariation, 
-    vec2 basePos, float posVariation, 
-    vec2 baseVel, float velVariation, 
-    float baseSize, float sizeVariation, 
-    float baseLifetime, float lifetimeVariation, 
-    int numParticles
-) {
-    for (int i = 0; i < numParticles; i++) {
-        vec2 particlePos = basePos + vec2(randFloat(-posVariation, posVariation), randFloat(-posVariation, posVariation));
-        vec2 particleVel = baseVel + vec2(randFloat(-velVariation, velVariation), randFloat(-velVariation, velVariation));
-
-        u8vec3 modifiedColor = {
-            glm::clamp(int(baseColor.x) + randInt(-colorVariation, colorVariation), 0, 255),
-            glm::clamp(int(baseColor.y) + randInt(-colorVariation, colorVariation), 0, 255),
-            glm::clamp(int(baseColor.z) + randInt(-colorVariation, colorVariation), 0, 255)
-        };
-
-        float particleSize = glm::max(baseSize + randFloat(-sizeVariation, sizeVariation), 0.01f);
-        float particleLifetime = glm::max(baseLifetime + randFloat(-lifetimeVariation, lifetimeVariation), 0.01f);
-
-        if(
-            (particleLifetime > 0) &&
-            (particleSize > 0) &&
-            true
-        ){
-            addParticle(modifiedColor, particlePos, particleVel, particleSize, particleLifetime);
-        }
-    }
-}
-
-void Particle::draw(VisualView* view){
-    view->draw_dynamic_shape(shape, SolidColor);
-}
-void Particle::update(double dTime){
-    shape.props.CIRCLE_radius *= (1.0 - (double)dTime / (double)lifetime);
-}
-
 //TODO explosion
 void LogicalScene::BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery){
     //like smoke or smth
     float R = bullet->state.radius;
-    addEffect(
+    particle_system.addEffect(
         twpp::zinc(800), // Base color
         3,               // Color variation
         bullet->actor.state.pos, // Base position
@@ -671,7 +649,7 @@ void LogicalScene::BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery){
         7                // Number of particles
     );
     
-    addEffect(
+    particle_system.addEffect(
         bullet->actor.properties.color,  // Base color
         20,                              // Color variation
         bullet->actor.state.pos,         // Base position
@@ -687,7 +665,7 @@ void LogicalScene::BulletSceneryHitEffect(Projectile* bullet, Scenery* scenery){
 }
 
 void LogicalScene::BulletPlayerHitEffect(Projectile* bullet, Player* player){
-    addEffect(
+    particle_system.addEffect(
         player->actor.properties.color,   // Base color
         20,                               // Color variation
         (bullet->actor.state.pos + player->actor.state.pos) / 2.0f, // Base position (midpoint between bullet and player for more stability)
@@ -701,7 +679,7 @@ void LogicalScene::BulletPlayerHitEffect(Projectile* bullet, Player* player){
         10                                // Number of particles
     );
 
-    addEffect(
+    particle_system.addEffect(
         bullet->actor.properties.color,   // Base color
         20,                               // Color variation
         bullet->actor.state.pos,          // Base position
@@ -723,7 +701,7 @@ void LogicalScene::PlayerJumpEffect(Player* player){
     vec2 player_bottom = player->actor.state.pos;
         player_bottom.y -= player->props.radius;
 
-    addEffect(
+    particle_system.addEffect(
         player->actor.properties.color,   // Base color
         20,                               // Color variation
         player_bottom,                    // Base position

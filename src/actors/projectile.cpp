@@ -1,25 +1,23 @@
 #include "projectile.hpp"
+#include "actors/player.hpp"
 
-bool Projectile::processPlayerHit(PlayerState* player){
-    // if(player.blocks){
-    //     //bounce
-    //     return true;
-    // }
-    // else {
-    //     b2DestroyBody(actor.bindings.body); //TODO
-    //     //false=destroy
-    //     return false;
-    // }
-    // b2DestroyBody(actor.bindings.body);
-    return false;
+bool Projectile::processPlayerHit(Player* player){
+    if(player->blocking()){
+        return true;
+    }
+    if(master->props.life_steal_percentage > 0){
+        master->processHeal(state.damage * master->props.life_steal_percentage);
+    }
+
+    return false; // never survives
 }
 
 //return true if bullet survives, false if should be killed
-bool Projectile::processSceneryHit(SceneryState* scenery){
+bool Projectile::processSceneryHit(Scenery* scenery){
     if(state.bounces_left > 0){
         //bounce
         state.bounces_left--;
-        state.damage += props.damage * props.extra_damage_per_bounce; 
+        state.damage += master->state.damage * master->props.extra_damage_per_bounce; 
         return true;
     }
     else {
@@ -32,13 +30,13 @@ bool Projectile::processSceneryHit(SceneryState* scenery){
 void Projectile::addToWorld(PhysicalWorld* world, int group){
     //TODO capsule
     b2Circle bullet_circle = {};
-        bullet_circle.radius = props.radius;
+        bullet_circle.radius = master->props.bullet_radius;
     b2Filter bulletFilter = {};
         bulletFilter.categoryBits = to_underlying(ActorType::Projectile);
         bulletFilter.maskBits = to_underlying(ActorType::Projectile|ActorType::Player|ActorType::StaticScenery|ActorType::DynamicScenery|ActorType::Border);
         bulletFilter.groupIndex = group;
     b2ShapeDef bouncy_shape = b2DefaultShapeDef();
-        bouncy_shape.restitution = props.bounciness;
+        bouncy_shape.restitution = 1; //TODO?
         bouncy_shape.friction = 0;
         bouncy_shape.filter = bulletFilter;
     b2BodyDef bullet_bdef = b2DefaultBodyDef();
@@ -77,9 +75,9 @@ void Projectile::updateTrailData() {
 
 void Projectile::update(PhysicalWorld* world, float dTime){
     // scaling for Grow
-    if(props.grow_factor != 0){
-        state.damage *= exp(dTime*props.grow_factor);
-        state.radius *= exp(dTime*props.grow_factor);
+    if(master->props.grow_factor != 0){
+        state.damage *= exp(dTime*master->props.grow_factor);
+        state.radius *= exp(dTime*master->props.grow_factor);
         auto prev = b2Shape_GetCircle(actor.bindings.shape);
         prev.radius = state.radius;
         b2Shape_SetCircle(actor.bindings.shape, &prev);
@@ -125,25 +123,20 @@ void Projectile::drawTrail(VisualView* view) {
     }
 }
 
-void Projectile::setupFromPlayer(PlayerState* ownerState, PlayerProps* ownerProps, Actor* ownerActor) {
-    props.damage = ownerProps->bullet_damage;
-    props.extra_damage_per_bounce = ownerProps->extra_damage_per_bounce;
-    props.bounciness = .9;
-    props.radius = ownerProps->bullet_radius;
-    props.grow_factor = ownerProps->grow_factor;
+void Projectile::setupFromPlayer(Player* owner) {
+    master = owner;
 
     actor.state.pos = 
-        ownerActor->state.pos +
-        ownerState->aim_direction * (props.radius + ownerProps->radius + 0.1f);
+        owner->actor.state.pos +
+        owner->state.aim_direction * (master->props.bullet_radius + owner->props.radius + 0.1f);
     actor.state.vel = 
-        ownerState->aim_direction * 
-        float(ownerProps->bullet_speed);
+        owner->state.aim_direction * 
+        float(owner->props.bullet_speed);
         // actor.state.vel+=ownerActor->state.vel;
-    state.radius = props.radius;
-    state.damage = ownerState->damage;
-    props.damage = ownerState->damage;
-    actor.properties.color = ownerProps->bullet_color;
-    state.bounces_left = ownerProps->bullet_bounces;
+    state.radius = owner->props.bullet_radius;
+    state.damage = owner->state.damage;
+    actor.properties.color = owner->props.bullet_color;
+    state.bounces_left = owner->props.bullet_bounces;
 
     //to not have a trail to (0,0)
     for(auto& seg : trailSegments){

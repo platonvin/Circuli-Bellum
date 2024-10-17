@@ -84,12 +84,12 @@ public:
 
 struct PhysicalState {
     glm::vec2 pos = glm::vec2(0);
-    glm::vec2 old_pos = glm::vec2(0);
+    // glm::vec2 old_pos = glm::vec2(0);
     glm::vec2 rot = glm::vec2(1,0);
     glm::vec2 vel = glm::vec2(0);
 };
 struct PhysicalProperties {
-    glm::u8vec3 color = twpp::purple(500);
+    glm::u8vec4 color = twpp::purple(500);
     ShapeType shape_type = Circle;
     b2BodyType body_type = b2_staticBody;
     float friction = 0.3;
@@ -151,72 +151,75 @@ void PhysicalWorld::addActor (PhysicalBindings* bind, PhysicalState* state, Phys
 }
 
 // basically for light.
+// not float pendulum XD
 struct DoublePendulum{
+    using ftype = double;
+    using vec = dvec2;
     // Angles 
-    float theta1 = glm::radians(120.0);
-    float theta2 = glm::radians(100.0);
+    ftype theta1 = glm::radians(120.0);
+    ftype theta2 = glm::radians(100.0);
     // Angular velocities
-    float omega1 = 0;
-    float omega2 = 0;  
+    ftype omega1 = 0;
+    ftype omega2 = 0;  
 
-    const float g = 9.81f;
-    const float length1 = 1.0f;
-    const float length2 = 1.0f;
-    const float mass1 = 1.0f;
-    const float mass2 = 1.0f;
-    const float damping = 0.99f;
+    const ftype g = 9.82f; // im a bad person
+    const ftype length1 = 1.0f;
+    const ftype length2 = 1.0f;
+    const ftype mass1 = 1.0f;
+    const ftype mass2 = 1.0f;
+    const ftype conservation = 0.992f;
 
-    void simulate(float dTime) {
-        // Extract current angles and angular velocities
-        // float theta1 = theta1;
-        // float theta2 = theta2;
-        // float omega1 = omega1;
-        // float omega2 = omega2;
+    // lol did not know it existed
+    const ftype epsilon = std::numeric_limits<ftype>::epsilon();
 
-        // Equations of motion for the double pendulum
-        float deltaTheta = theta2 - theta1;
+    void simulate(ftype dTime) {
+        ftype deltaTheta = theta2 - theta1;
+        if (std::fabs(deltaTheta) < epsilon) deltaTheta = (deltaTheta >= 0) ? 10.0 * epsilon : -10.0 * epsilon;
 
-        float denominator1 = (mass1 + mass2) * length1 - mass2 * length1 * cos(deltaTheta) * cos(deltaTheta);
-        float denominator2 = (length2 / length1) * denominator1;
+        ftype denominator1 = (mass1 + mass2) * length1 - mass2 * length1 * cos(deltaTheta) * cos(deltaTheta);
+        ftype denominator2 = (length2 / length1) * denominator1;
 
-        float num1 = -g * (2 * mass1 + mass2) * sin(theta1) - mass2 * g * sin(theta1 - 2 * theta2) - 2 * sin(deltaTheta) * mass2 * (omega2 * omega2 * length2 + omega1 * omega1 * length1 * cos(deltaTheta));
-        float num2 = 2 * sin(deltaTheta) * (omega1 * omega1 * length1 * (mass1 + mass2) + g * (mass1 + mass2) * cos(theta1) + omega2 * omega2 * length2 * mass2 * cos(deltaTheta));
+        ftype num1 = -g * (2 * mass1 + mass2) * sin(theta1) - mass2 * g * sin(theta1 - 2 * theta2) - 2 * sin(deltaTheta) * mass2 * (omega2 * omega2 * length2 + omega1 * omega1 * length1 * cos(deltaTheta));
+        ftype num2 = 2 * sin(deltaTheta) * (omega1 * omega1 * length1 * (mass1 + mass2) + g * (mass1 + mass2) * cos(theta1) + omega2 * omega2 * length2 * mass2 * cos(deltaTheta));
 
-        // Update angular accelerations
-        float alpha1 = num1 / denominator1;
-        float alpha2 = num2 / denominator2;
+        ftype alpha1 = num1 / denominator1;
+        ftype alpha2 = num2 / denominator2;
 
-        // Apply Euler integration to update the angular velocities
         omega1 += alpha1 * dTime;
         omega2 += alpha2 * dTime;
 
-        // Apply damping (decay)
-        omega1 *= damping;
-        omega2 *= damping;
+        omega1 *= conservation;
+        omega2 *= conservation;
 
-        // Update the angles using the new angular velocities
         theta1 += omega1 * dTime;
         theta2 += omega2 * dTime;
 
-        // Store the new values back in the pendulum state
-        // theta1 = theta1;
-        // theta2 = theta2;
-        // omega1 = omega1;
-        // omega2 = omega2;
+        // theta1 = wrap(theta1);
+        // theta2 = wrap(theta2);
+        if (std::isnan(theta1) || std::isnan(theta2) || std::isnan(omega1) || std::isnan(omega2)) {
+            reset_state();
+        }
     }
 
-    void apply_impulse(float impulse1, float impulse2) {
-        omega1 += impulse1;
-        omega2 += impulse2;
+    void reset_state() {
+        theta1 = glm::radians(120.0);
+        theta2 = glm::radians(100.0);
+        omega1 = 0;
+        omega2 = 0;
+    }
+
+    void apply_impulse(ftype impulse1, ftype impulse2) {
+        omega1 += glm::min(impulse1, 50.0);
+        omega2 += glm::min(impulse2, 50.0);
     }
 
     glm::vec2 get_pendulum_position1() {
-        return glm::vec2(length1 * sin(theta1), -length1 * cos(theta1));
+        return vec(length1 * sin(theta1), -length1 * cos(theta1));
     }
 
     glm::vec2 get_pendulum_position2() {
-        glm::vec2 pos1 = get_pendulum_position1();
-        return pos1 + glm::vec2(length2 * sin(theta2), -length2 * cos(theta2));
+        vec pos1 = get_pendulum_position1();
+        return pos1 + vec(length2 * sin(theta2), -length2 * cos(theta2));
     }
 };
 
