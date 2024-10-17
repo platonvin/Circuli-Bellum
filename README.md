@@ -1,9 +1,8 @@
 [![Build](https://github.com/platonvin/Circuli-Bellum/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/platonvin/Circuli-Bellum/actions/workflows/c-cpp.yml)
 # Circulli Bellum 
 
-some footage:
-
-https://github.com/platonvin/Circuli-Bellum/blob/master/readme_content/video_1.mp4
+<!-- ![footage](readme_content/cb.gif) -->
+![Screencast](readme_content/video_1.mp4)
 
 **Circulli Bellum** is my clone of the game **"ROUNDS"**, but *somewhat* from scratch. The game uses [Box2D](https://github.com/erincatto/box2d) for physics and Vulkan for graphics (via [Lum-al](https://github.com/platonvin/lum-al))
 
