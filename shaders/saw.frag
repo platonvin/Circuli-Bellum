@@ -18,6 +18,14 @@ const int NUM_SAMPLE = 8;
 const float SEGENDS_SMOOTHNESS = 0.1;
 const float SEGSIDE_SMOOTHNESS = 0.1;
 
+float hash_u1f1( uint n ) 
+{
+    // integer hash copied from Hugo Elias
+	n = (n << 13U) ^ n;
+    n = n * (n * n * 15731U + 789221U) + 1376312589U;
+    return float( n & uint(0x7fffffffU))/float(0x7fffffff);
+}
+
 float sawBladeSDFSample(in vec2 uv, float angleShift) {
     float angle = atan(uv.y, uv.x) + angleShift;
     angle += ubo.time * 7.73 / 1.0;
