@@ -3,7 +3,8 @@
 # Circulli Bellum 
 
 <!-- simply ![footage](readme_content/cb.gif) does not work -->
-<video src="readme_content/video_1.mp4" width="525" height="300" autoplay loop></video>
+
+https://github.com/user-attachments/assets/e60a025d-6315-42ad-a20d-7989150d5440
 
 **Circulli Bellum** is my clone of the game **"ROUNDS"**, but *somewhat* from scratch. The game uses [Box2D](https://github.com/erincatto/box2d) for physics and Vulkan for graphics (via [Lum-al](https://github.com/platonvin/lum-al))
 
