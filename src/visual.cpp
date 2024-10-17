@@ -18,6 +18,7 @@ void VisualView::setup() {
         settings.deviceFeatures.geometryShader = VK_TRUE;
         settings.deviceFeatures.independentBlend = VK_TRUE;
         settings.deviceFeatures.shaderInt16 = VK_TRUE;
+        settings.deviceFeatures.samplerAnisotropy = VK_TRUE;
         settings.deviceFeatures11.storagePushConstant16 = VK_TRUE;
         settings.deviceFeatures12.storagePushConstant8 = VK_TRUE;
         settings.deviceFeatures12.shaderInt8 = VK_TRUE;

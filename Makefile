@@ -4,7 +4,7 @@
 I = -Isrc -Icommon -Ilum-al/src -Ibox2d/include -Itw-colors-cpp
 L = -Llum-al/lib -Lbox2d/lib
 
-CPP_COMPILER = g++
+CPP_COMPILER = c++
 # CPP_COMPILER = clang++
 
 STATIC_OR_DYNAMIC = 
@@ -57,7 +57,7 @@ vcpkg_installed_eval: vcpkg_installed
 	$(eval GLSLC_DIR := $(firstword $(foreach dir, $(OTHER_DIRS), $(wildcard $(dir)/tools/shaderc))) )
 	$(eval GLSLC := $(strip $(GLSLC_DIR))/glslc )
 
-setup: init vcpkg_installed_eval lum-al/lib/liblumal.a
+setup: init vcpkg_installed_eval lum-al/lib/liblumal.a box2d/lib/libbox2d.a
 #If someone knows a way to simplify this, please tell me 
 obj/rel/%.o: setup
 obj/rel/%.o: src/%.cpp
@@ -105,31 +105,37 @@ endif
 profile: args := $(profile_flags)
 profile: release
 
-release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_rel 
+release: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a box2d/lib/libbox2d.a build_rel 
 ifeq ($(OS),Windows_NT)
 	.\client_rel
 else
 	./client_rel
 endif
 
-crazy: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a build_crz 
+crazy: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a box2d/lib/libbox2d.a build_crz 
 ifeq ($(OS),Windows_NT)
 	.\client_crz
 else
 	./client_crz
 endif
 # .PHONY: lumal 
-lumal: lum-al/lib/liblumal.a
-# .PHONY: lum-al/lib/liblumal.a
+lumal: lum-al/lib/liblumal.a box2d/lib/libbox2d.a
+# .PHONY: lum-al/lib/liblumal.a box2d/lib/libbox2d.a
 lum-al/lib/liblumal.a: vcpkg_installed
 	git submodule init
 	git submodule update
 	cd lum-al
 	make library
 	cd ..
+box2d/lib/libbox2d.a: vcpkg_installed
+	git submodule init
+	git submodule update
+	cd box2d
+	make
+	cd ..
 
 #mostly for testing
-only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a $(rel_objs) build_rel
+only_build: init vcpkg_installed_eval shaders lum-al/lib/liblumal.a box2d/lib/libbox2d.a $(rel_objs) build_rel
 
 #i could not make it work without this
 build_deb: setup $(deb_objs)
